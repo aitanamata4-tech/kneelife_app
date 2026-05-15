@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "118067489924",
+    "firebase_url": "https://kneelife1-default-rtdb.firebaseio.com",
+    "project_id": "kneelife1",
+    "storage_bucket": "kneelife1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:118067489924:android:1ce92f6300357b8b6066d1",
+        "android_client_info": {
+          "package_name": "com.example.kneelife_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAeZ6Y5vFC-m1pp83sZyEbPkBswwhBl2Rs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
