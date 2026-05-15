@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../theme/app_theme.dart';
 
 class MenuPacientScreen extends StatelessWidget {
   const MenuPacientScreen({super.key});
@@ -18,7 +17,7 @@ class MenuPacientScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("Hola, Pacient!", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: primaryBlue)),
+            const Text("Hola, Pacient!", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.blue)),
             const Text("Què vols fer avui?", style: TextStyle(color: Colors.grey)),
             const SizedBox(height: 30),
             
@@ -38,7 +37,7 @@ class MenuPacientScreen extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ListTile(
         contentPadding: const EdgeInsets.all(16),
-        leading: Icon(icon, size: 40, color: primaryBlue),
+        leading: Icon(icon, size: 40, color: Colors.blue),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text(subtitle),
         trailing: const Icon(Icons.chevron_right),

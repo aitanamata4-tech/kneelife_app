@@ -1,24 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart'; // Importante: esto conecta con Firebase
 
-// Definimos los colores de KneeLife según el diseño
-const Color primaryBlue = Color(0xFF1565C0);
-const Color lightBlue = Color(0xFF42A5F5);
-const Color backgroundWhite = Color(0xFFF5F9FF);
-const Color errorRed = Color(0xFFC62828);
+void main() async {
+  // Estas dos líneas son "mágicas": preparan la app para conectarse a Internet
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(); 
+  
+  runApp(const KneeLifeApp());
+}
 
-class AppTheme {
-  static ThemeData lightTheme = ThemeData(
-    primaryColor: primaryBlue,
-    scaffoldBackgroundColor: backgroundWhite,
-    appBarTheme: const AppBarTheme(backgroundColor: primaryBlue, foregroundColor: Colors.white),
-    // Los botones deben ser azules y con bordes redondeados
-    elevatedButtonTheme: ElevatedButtonThemeData(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: primaryBlue,
-        foregroundColor: Colors.white,
-        minimumSize: const Size(double.infinity, 56),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    ),
-  );
+class KneeLifeApp extends StatelessWidget {
+  const KneeLifeApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'KneeLife',
+      //theme: AppTheme.lightTheme,
+       // Empezamos siempre por el Login
+    );
+  }
 }

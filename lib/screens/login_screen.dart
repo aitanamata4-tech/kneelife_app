@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../theme/app_theme.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -13,10 +12,10 @@ class LoginScreen extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             // Logo de la rodillera inteligente
-            const Icon(Icons.accessibility_new, size: 80, color: primaryBlue),
+            const Icon(Icons.accessibility_new, size: 80, color: Colors.blue),
             const Text(
               "KneeLife",
-              style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: primaryBlue),
+              style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.blue),
             ),
             const Text("La teva rehabilitació intel·ligent", style: TextStyle(color: Colors.grey)),
             
