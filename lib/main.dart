@@ -1,12 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'screens/login_screen.dart';
+import 'package:provider/provider.dart';
+import 'package:kneelife_app/theme/app_theme.dart';
+import 'package:kneelife_app/services/ble_services.dart';
+import 'package:kneelife_app/screens/login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Això inicialitza Firebase fent servir el google-services.json
+  
+  // Inicialitza Firebase correctament fent servir el google-services.json
   await Firebase.initializeApp(); 
-  runApp(const KneeLifeApp());
+  
+  runApp(
+    MultiProvider(
+      providers: [
+        Provider<BleService>(
+          create: (_) => BleService(),
+          dispose: (_, bleService) => bleService.disconnect(),
+        ),
+      ],
+      child: const KneeLifeApp(),
+    ),
+  );
 }
 
 class KneeLifeApp extends StatelessWidget {
@@ -17,7 +32,10 @@ class KneeLifeApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'KneeLife',
-      // theme: AppTheme.lightTheme,
+      
+      // Activem el vostre tema visual corporatiu sense errors
+      theme: AppTheme.lightTheme, 
+      
       home: const LoginScreen(),
     );
   }
