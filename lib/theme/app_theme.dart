@@ -1,43 +1,53 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // Definim els colors principals de KneeLife (Blau, Grisclar i Blanc)
-  static const Color primaryColor = Colors.blue;
-  static const Color backgroundColor = Color(0xfff5f5f5);
+  // Paleta de colors corporatius de KneeLife
+  static const Color primaryBlue    = Color(0xFF1565C0);
+  static const Color lightBlue      = Color(0xFF42A5F5);
+  static const Color backgroundWhite = Color(0xFFF5F9FF);
+  static const Color cardWhite      = Color(0xFFFFFFFF);
+  static const Color textDark       = Color(0xFF1A237E);
+  static const Color textGrey       = Color(0xFF757575);
+  static const Color successGreen   = Color(0xFF2E7D32);
+  static const Color warningOrange  = Color(0xFFE65100);
+  static const Color errorRed       = Color(0xFFC62828);
 
   static ThemeData get lightTheme {
     return ThemeData(
-      primaryColor: primaryColor,
-      scaffoldBackgroundColor: backgroundColor,
-      useMaterial3: true,
-      
-      // Estil dels botons de l'aplicació
+      primaryColor: primaryBlue,
+      scaffoldBackgroundColor: backgroundWhite,
+      appBarTheme: const AppBarTheme(
+        backgroundColor: primaryBlue,
+        elevation: 0,
+        centerTitle: true,
+        foregroundColor: Colors.white,
+      ),
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: primaryBlue,
+        primary: primaryBlue,
+        secondary: lightBlue,
+        error: errorRed,
+        surface: cardWhite,
+      ),
+      cardTheme: CardThemeData(
+        color: cardWhite,
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: primaryColor,
+          backgroundColor: primaryBlue,
           foregroundColor: Colors.white,
-          minimumSize: const Size(double.infinity, 50),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+          minimumSize: const Size(double.infinity, 56),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),
-      
-      // Estil dels camps de text (com els del Login)
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: primaryColor, width: 2),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: primaryBlue,
+          side: const BorderSide(color: primaryBlue),
+          minimumSize: const Size(double.infinity, 56),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),
     );
