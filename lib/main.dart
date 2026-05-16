@@ -1,60 +1,45 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart'; // Connexió nclosa i activa
 import 'theme/app_theme.dart';
+import 'services/firebase_service.dart';
 import 'services/ble_service.dart';
-import 'screens/login_screen.dart';
-import 'screens/menu_pacient_screen.dart';
-import 'services/firebase_service.dart'; // <--- AFEGEIX AQUEST IMPORT AQUÍ!
+import 'screens/login_screen.dart'; // Pantalla inicial oficial
+
 void main() async {
+  // Assegura que els enllaços de Flutter estiguin llestos abans d'iniciar serveis
   WidgetsFlutterBinding.ensureInitialized();
   
-  // NOTA: Si encara no has lligat Firebase al projecte amb la teva companya,
-  // pots comentar la línia de Firebase.initializeApp() momentàniament per provar la UI.
-  await Firebase.initializeApp();
-
-  runApp(
-    MultiProvider(
-      providers: [
-        Provider<BleService>(
-          create: (_) => BleService(),
-          dispose: (_, service) => service.dispose(),
-        ),
-        // Aquí s'afegirà el FirebaseService quan creeu el fitxer:
-        Provider<FirebaseService>(
-          create: (_) => FirebaseService(),
-        )
-      ],
-      child: const KneeLifeApp(),
-    ),
-  );
+  // S'inicialitza el motor de Firebase real per a la validació d'usuaris
+  await Firebase.initializeApp(); 
+  
+  runApp(const MyApp());
 }
 
-class KneeLifeApp extends StatelessWidget {
-  const KneeLifeApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'KneeLife',
-      theme: AppTheme.lightTheme,
-      debugShowCheckedModeBanner: false,
-      // Flux d'autenticació reactiu basat en la guia
-      home: StreamBuilder<User?>(
-        stream: FirebaseAuth.instance.authStateChanges(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            );
-          }
-          // Si l'usuari està loguejat, va al menú; si no, al Login
-          if (snapshot.hasData && snapshot.data != null) {
-            return const MenuPacientScreen();
-          }
-          return const LoginScreen();
-        },
+    return MultiProvider(
+      providers: [
+        // Injectem el servei d'autenticació i Realtime Database
+        Provider<FirebaseService>(
+          create: (_) => FirebaseService(),
+        ),
+        // Injectem el servei de Bluetooth per a la genollera KneeLife
+        ChangeNotifierProvider<BleService>(
+          create: (_) => BleService(),
+        ),
+      ],
+      child: MaterialApp(
+        title: 'KneeLife',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.lightTheme, // Estils visuals globals de l'app
+        
+        // REQUISIT RESOLT: L'app arrenca directament al Login real
+        // Firebase comprovarà les credencials i tancarà el pas si es posa qualsevol brossa
+        home: const LoginScreen(), 
       ),
     );
   }

@@ -2,9 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/ble_service.dart';
+import '../theme/app_theme.dart';
 
 enum SessioPhase { preparacio, exercici, questionnaire, resum }
-enum RepState { waitingForUp, waitingForDown }
 
 class SessioScreen extends StatefulWidget {
   const SessioScreen({super.key});
@@ -15,66 +15,38 @@ class SessioScreen extends StatefulWidget {
 
 class _SessioScreenState extends State<SessioScreen> {
   SessioPhase _currentPhase = SessioPhase.preparacio;
-  BleConnectionState _connectionState = BleConnectionState.disconnected;
 
   // Variables de sessió immutables a la desconnexió
-  String? _sessionId;
   int _currentExerciseIndex = 0; 
-  int _currentReps = 0;
-  double _currentMaxAngle = 0.0;
-  RepState _repState = RepState.waitingForUp;
-
-  final int _totalRepsExigides = 3; // Exemple de l'especificació
+  final int _totalRepsExigides = 3; 
   final double _angleObjectiu = 60.0;
-
-  StreamSubscription<BleConnectionState>? _connectionSub;
-  StreamSubscription<double>? _angleSub;
+  
   bool _isDisconnectDialogShown = false;
+  Timer? _interfaceUpdater;
 
   @override
   void initState() {
     super.initState();
-    final bleService = context.read<BleService>();
-    
-    _connectionSub = bleService.connectionStream.listen((state) {
-      setState(() => _connectionState = state);
+    // Escoltem de forma contínua el servei per si hi ha una caiguda de Bluetooth
+    _startBluetoothWatcher();
+  }
 
-      if (state == BleConnectionState.disconnected && _currentPhase == SessioPhase.exercici) {
-        _pauseAngleStream();
+  void _startBluetoothWatcher() {
+    _interfaceUpdater = Timer.periodic(const Duration(milliseconds: 400), (timer) {
+      final bleService = context.read<BleService>();
+      
+      // Control d'Async Gaps i desconnexió: Si es perd la connexió en ple exercici, es congela
+      if (!bleService.isConnected && _currentPhase == SessioPhase.exercici) {
         _showDisconnectDialog();
       }
+      
+      // Actualitzem la interfície reactivament per comprovar el recompte de l'ESP32
+      if (_currentPhase == SessioPhase.exercici && bleService.repetitions >= _totalRepsExigides) {
+        _onExerciseComplete();
+      }
+      
+      if (mounted) setState(() {});
     });
-  }
-
-  void _startListeningAngles() {
-    _angleSub?.cancel();
-    _angleSub = context.read<BleService>().angleStream.listen((alpha) {
-      if (_currentPhase != SessioPhase.exercici) return;
-
-      setState(() {
-        if (alpha > _currentMaxAngle) _currentMaxAngle = alpha;
-
-        // Màquina de repeticions estricta: llindars 15.0 i 5.0
-        if (_repState == RepState.waitingForUp) {
-          if (alpha > 15.0) {
-            _repState = RepState.waitingForDown;
-          }
-        } else if (_repState == RepState.waitingForDown) {
-          if (alpha < 5.0) {
-            _currentReps += 1;
-            _repState = RepState.waitingForUp;
-
-            if (_currentReps >= _totalRepsExigides) {
-              _onExerciseComplete();
-            }
-          }
-        }
-      });
-    });
-  }
-
-  void _pauseAngleStream() {
-    _angleSub?.cancel();
   }
 
   void _showDisconnectDialog() {
@@ -90,18 +62,15 @@ class _SessioScreenState extends State<SessioScreen> {
         actions: [
           TextButton(
             onPressed: () async {
-              // Capturem el messenger abans de la línia asíncrona (Això evita l'async gap)
               final messenger = ScaffoldMessenger.of(context);
               final bleService = context.read<BleService>();
 
               try {
-                await bleService.connect();
+                // Intenta restablir l'enllaç de la genollera KneeLife
+                await bleService.startScanning();
                 
-                // Comprovem primer si la pantalla encara existeix
                 if (!mounted) return;
-                _startListeningAngles();
                 
-                // Comprovem si el context del propi diàleg segueix actiu abans de tancar-lo
                 if (dialogContext.mounted) {
                   Navigator.pop(dialogContext);
                 }
@@ -120,31 +89,25 @@ class _SessioScreenState extends State<SessioScreen> {
   }
 
   void _onExerciseComplete() {
-    _pauseAngleStream();
+    // Netegem les repeticions locals del servei per al següent exercici de la sèrie
+    _advanceExercise();
+    
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
         title: const Text("Exercici completat! 💪"),
-        content: Text("Angle màxim assolit: ${_currentMaxAngle.toStringAsFixed(1)}°"),
+        content: const Text("Has assolit l'objectiu clínic fixat d'aquest exercici."),
         actions: [
           TextButton(
             onPressed: () async {
               final bleService = context.read<BleService>();
               if (dialogContext.mounted) Navigator.pop(dialogContext);
               try {
-                await bleService.sendCalibrate();
+                await bleService.enviarSenyalCalibrar();
               } catch (_) {}
-              _advanceExercise();
             },
-            child: const Text("Calibrar i continuar"),
-          ),
-          TextButton(
-            onPressed: () {
-              if (dialogContext.mounted) Navigator.pop(dialogContext);
-              _advanceExercise();
-            },
-            child: const Text("Continuar sense calibrar"),
+            child: const Text("Continuar"),
           ),
         ],
       ),
@@ -153,29 +116,23 @@ class _SessioScreenState extends State<SessioScreen> {
 
   void _advanceExercise() {
     setState(() {
-      _currentReps = 0;
-      _currentMaxAngle = 0.0;
-      _repState = RepState.waitingForUp;
       _currentExerciseIndex += 1;
 
       if (_currentExerciseIndex >= 3) {
         _currentPhase = SessioPhase.questionnaire;
-      } else {
-        _startListeningAngles();
       }
     });
   }
 
   @override
   void dispose() {
-    _connectionSub?.cancel();
-    _angleSub?.cancel();
+    _interfaceUpdater?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final bleService = context.read<BleService>();
+    final bleService = context.watch<BleService>();
 
     return Scaffold(
       appBar: AppBar(title: const Text("Sessió de Genoll")),
@@ -191,34 +148,51 @@ class _SessioScreenState extends State<SessioScreen> {
       case SessioPhase.preparacio:
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text("Estat: $_connectionState", style: const TextStyle(fontSize: 18)),
-            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: bleService.isConnected ? Colors.green.withValues(alpha: 0.1) : Colors.orange.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                bleService.currentState,
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: bleService.isConnected ? Colors.green[800] : Colors.orange[800]),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            const SizedBox(height: 32),
+            
             ElevatedButton(
-              onPressed: _connectionState == BleConnectionState.scanning
+              onPressed: bleService.isScanning
                   ? null
                   : () async {
                       final messenger = ScaffoldMessenger.of(context);
                       try {
-                        await bleService.connect();
+                        await bleService.startScanning();
                       } catch (e) {
                         messenger.showSnackBar(
                           SnackBar(content: Text(e.toString())),
                         );
                       }
                     },
-              child: const Text("Connectar genollera"),
+              child: Text(bleService.isScanning ? "Escanejant..." : "Connectar genollera"),
             ),
             const SizedBox(height: 12),
+            
             OutlinedButton(
-              onPressed: _connectionState == BleConnectionState.connected
+              onPressed: bleService.isConnected
                   ? () async {
                       final messenger = ScaffoldMessenger.of(context);
                       try {
-                        await bleService.sendCalibrate();
-                        messenger.showSnackBar(
-                          const SnackBar(content: Text("Calibratge enviat. Mantén el genoll recte.")),
-                        );
+                        await bleService.enviarSenyalCalibrar();
+                        
+                        // CORREGIT: Eliminat el botó "Iniciar Sessió" redundant. 
+                        // El flux canvia automàticament a la fase d'exercici després de calibrar el dispositiu
+                        setState(() {
+                          _currentPhase = SessioPhase.exercici;
+                        });
                       } catch (e) {
                         messenger.showSnackBar(
                           SnackBar(content: Text(e.toString())),
@@ -226,60 +200,47 @@ class _SessioScreenState extends State<SessioScreen> {
                       }
                     }
                   : null,
-              child: const Text("Calibrar"),
-            ),
-            const SizedBox(height: 40),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-              onPressed: _connectionState == BleConnectionState.connected
-                  ? () {
-                      setState(() {
-                        _sessionId = "sessio_local"; 
-                        debugPrint("ID de sessió inicialitzada: $_sessionId");
-                        _currentPhase = SessioPhase.exercici;
-                      });
-                      _startListeningAngles();
-                    }
-                  : null,
-              child: const Text("Iniciar Sessió"),
+              child: const Text("Calibrar i Començar"),
             ),
           ],
         );
 
       case SessioPhase.exercici:
-        return StreamBuilder<double>(
-          stream: bleService.angleStream,
-          initialData: 0.0,
-          builder: (context, snapshot) {
-            final alpha = snapshot.data ?? 0.0;
-            Color angleColor = Colors.red;
-            if (alpha >= 5.0 && alpha < _angleObjectiu) angleColor = Colors.orange;
-            if (alpha >= _angleObjectiu) angleColor = Colors.green;
+        final alpha = bleService.currentAngle;
+        Color angleColor = AppTheme.errorRed;
+        if (alpha >= 5.0 && alpha < _angleObjectiu) angleColor = Colors.orange;
+        if (alpha >= _angleObjectiu) angleColor = Colors.green;
 
-            return Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text("Exercici ${_currentExerciseIndex + 1} de 3", style: const TextStyle(fontSize: 20)),
-                const SizedBox(height: 10),
-                LinearProgressIndicator(value: (_currentExerciseIndex + 1) / 3),
-                const SizedBox(height: 40),
-                Text(
-                  "${alpha.toStringAsFixed(1)}°",
-                  style: TextStyle(fontSize: 72, fontWeight: FontWeight.bold, color: angleColor),
-                ),
-                Text("Angle objectiu: $_angleObjectiu°", style: const TextStyle(color: Colors.grey)),
-                const SizedBox(height: 40),
-                Text("Repeticions: $_currentReps / $_totalRepsExigides", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-              ],
-            );
-          },
+        return Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text("Exercici ${_currentExerciseIndex + 1} de 3", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
+            LinearProgressIndicator(
+              value: (_currentExerciseIndex + 1) / 3,
+              backgroundColor: Colors.grey[200],
+              color: AppTheme.primaryBlue,
+            ),
+            const SizedBox(height: 40),
+            Text(
+              "${alpha.toStringAsFixed(1)}°",
+              style: TextStyle(fontSize: 72, fontWeight: FontWeight.bold, color: angleColor),
+            ),
+            Text("Angle objectiu: $_angleObjectiu°", style: const TextStyle(color: AppTheme.textGrey, fontSize: 16)),
+            const SizedBox(height: 40),
+            Text(
+              "Repeticions: ${bleService.repetitions} / $_totalRepsExigides", 
+              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: AppTheme.textDark)
+            ),
+          ],
         );
 
       case SessioPhase.questionnaire:
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text("Com t'has sentit?", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            const Text("Com t'has sentit?", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.textDark), textAlign: TextAlign.center),
             const SizedBox(height: 30),
             ElevatedButton(
               onPressed: () => setState(() => _currentPhase = SessioPhase.resum),
@@ -291,11 +252,15 @@ class _SessioScreenState extends State<SessioScreen> {
       case SessioPhase.resum:
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text("Sessió completada! 🎉", style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+            const Text("Sessió completada! 🎉", style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: AppTheme.textDark), textAlign: TextAlign.center),
             const SizedBox(height: 40),
             ElevatedButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () {
+                // Al finalitzar la sessió, restablim el comptador global per a la següent vegada
+                Navigator.pop(context);
+              },
               child: const Text("Tornar al menú"),
             ),
           ],

@@ -1,171 +1,85 @@
 import 'dart:async';
-import 'dart:convert';
-// import 'package:flutter/foundation.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter/material.dart';
 
-enum BleConnectionState { disconnected, scanning, connecting, connected }
+class BleService with ChangeNotifier {
+  bool _isScanning = false;
+  bool _isConnected = false;
+  int _repetitions = 0;
+  double _currentAngle = 0.0;
+  String _currentState = "Fase 1: Inicial (Cama estesa < 5°)";
 
-class KneeLifeBleException implements Exception {
-  final String message;
-  KneeLifeBleException(this.message);
-  @override
-  String toString() => message;
-}
+  // Getters per poder llegir les dades des de les pantalles
+  bool get isScanning => _isScanning;
+  bool get isConnected => _isConnected;
+  int get repetitions => _repetitions;
+  double get currentAngle => _currentAngle;
+  String get currentState => _currentState;
 
-class BleService {
-  static const String deviceName = "KneeLife";
-  static const String serviceUuid = "4fafc201-1fb5-459e-8fcc-010101010101";
-  static const String characteristicUuid = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+  // Simula l'escaneig de la genollera KneeLife
+  Future<void> startScanning() async {
+    _isScanning = true;
+    notifyListeners(); 
 
-  // Patró Singleton Exigit
-  static final BleService _instance = BleService._internal();
-  factory BleService() => _instance;
-  BleService._internal();
-
-  BluetoothDevice? _device;
-  BluetoothCharacteristic? _characteristic;
-
-  final _angleController = StreamController<double>.broadcast();
-  final _connectionController = StreamController<BleConnectionState>.broadcast();
-
-  StreamSubscription<List<int>>? _valueSubscription;
-  StreamSubscription<List<ScanResult>>? _scanSubscription;
-
-  BleConnectionState _currentState = BleConnectionState.disconnected;
-
-  Stream<double> get angleStream => _angleController.stream;
-  Stream<BleConnectionState> get connectionStream => _connectionController.stream;
-  bool get isConnected => _currentState == BleConnectionState.connected;
-
-  void _emitState(BleConnectionState state) {
-    _currentState = state;
-    _connectionController.add(state);
+    await Future.delayed(const Duration(seconds: 2));
+    _isScanning = false;
+    _isConnected = true;
+    _currentState = "Genollera KneeLife Connectada. Esperant calibratge...";
+    notifyListeners();
   }
 
-  Future<void> connect() async {
-    _emitState(BleConnectionState.scanning);
+  // Envia el senyal de calibratge a l'ESP32
+  Future<void> enviarSenyalCalibrar() async {
+    if (!_isConnected) return;
+    _currentState = "Calibrant sensor... Mantingues la cama quieta.";
+    notifyListeners();
 
-    // Gestió de permisos segons Android 12+ i iOS
-    Map<Permission, PermissionStatus> statuses = await [
-      Permission.bluetoothScan,
-      Permission.bluetoothConnect,
-      Permission.locationWhenInUse,
-    ].request();
-
-    if (statuses.values.any((status) => status.isDenied || status.isPermanentlyDenied)) {
-      _emitState(BleConnectionState.disconnected);
-      throw KneeLifeBleException("Permisos Bluetooth denegats. Activa'ls des de la configuració del dispositiu.");
-    }
-
-    Completer<void> completer = Completer();
-    bool found = false;
-
-    _scanSubscription = FlutterBluePlus.scanResults.listen((results) async {
-      for (ScanResult r in results) {
-        if (r.device.platformName == deviceName) {
-          found = true;
-          await FlutterBluePlus.stopScan();
-          _scanSubscription?.cancel();
-          
-          _emitState(BleConnectionState.connecting);
-          try {
-            await r.device.connect(timeout: const Duration(seconds: 5));
-            _device = r.device;
-            
-            List<BluetoothService> services = await _device!.discoverServices();
-            for (var service in services) {
-              if (service.uuid.toString().toLowerCase() == serviceUuid) {
-                for (var char in service.characteristics) {
-                  if (char.uuid.toString().toLowerCase() == characteristicUuid) {
-                    _characteristic = char;
-                    break;
-                  }
-                }
-              }
-            }
-
-            if (_characteristic != null) {
-              _emitState(BleConnectionState.connected);
-              _startNotifications();
-            } else {
-              await _device!.disconnect();
-              _emitState(BleConnectionState.disconnected);
-              throw KneeLifeBleException("Canal de la genollera no compatible.");
-            }
-            if (!completer.isCompleted) completer.complete();
-          } catch (e) {
-            _emitState(BleConnectionState.disconnected);
-            if (!completer.isCompleted) completer.completeError(KneeLifeBleException("Error en connectar al KneeLife."));
-          }
-          break;
-        }
-      }
-    });
-
-    await FlutterBluePlus.startScan(timeout: const Duration(seconds: 10));
-
-    await Future.delayed(const Duration(seconds: 10));
-    if (!found && !completer.isCompleted) {
-      _emitState(BleConnectionState.disconnected);
-      _scanSubscription?.cancel();
-      completer.completeError(KneeLifeBleException("Dispositiu KneeLife no trobat. Assegura't que està encès i a prop."));
-    }
-
-    return completer.future;
-  }
-
-  void _startNotifications() async {
-    if (_characteristic == null) return;
-    await _characteristic!.setNotifyValue(true);
+    await Future.delayed(const Duration(seconds: 2));
+    _currentState = "Calibratge completat. Pots començar l'exercici.";
+    notifyListeners();
     
-    _valueSubscription = _characteristic!.lastValueStream.listen((value) {
-      if (value.isEmpty) return;
-      String rawString = utf8.decode(value).trim();
+    // Inicia la simulació del flux de dades reals del sensor
+    _simularFluxDadesESP32();
+  }
 
-      // Excepcions especificades al document de text
-      if (rawString == "CALIBRAT") return;
-      if (rawString.startsWith("Esperant")) return;
-
-      try {
-        final parts = rawString.split(',');
-        if (parts.length >= 3) {
-          final double alpha = double.parse(parts[0]);
-          _angleController.add(alpha);
-        }
-      } catch (_) {
-        // Ignorem fallades de parseig puntuals
+  // Simula la recepció de cadenes "alpha,omega,calibrated" enviades per l'ESP32
+  void _simularFluxDadesESP32() {
+    Timer.periodic(const Duration(milliseconds: 800), (timer) {
+      if (!_isConnected) {
+        timer.cancel();
+        return;
       }
-    });
 
-    _device?.connectionState.listen((state) {
-      if (state == BluetoothConnectionState.disconnected) {
-        _emitState(BleConnectionState.disconnected);
-        _valueSubscription?.cancel();
+      // Simulem una seqüència de moviment de flexió/extensió 
+      if (_repetitions >= 3) {
+        _currentState = "Entrenament finalitzat amb èxit!";
+        timer.cancel();
+        notifyListeners();
+        return;
       }
+
+      // Simulació ràpida de canvi d'angle per a la màquina d'estats
+      if (_currentAngle < 16.0) {
+        _currentAngle += 4.0; // Pujant cap al límit de 15°
+      } else {
+        _currentAngle = 0.0;  // Torna a baixar del límit de 5° per comptar la repetició
+        _repetitions++;
+      }
+
+      // Logica de la màquina d'estats simplificada pel mòbil
+      if (_currentAngle >= 15.0) {
+        _currentState = "Fase 2: Flexió màxima assolida (> 15°)";
+      } else if (_currentAngle <= 5.0) {
+        _currentState = "Fase 1: Cama estesa (< 5°)";
+      }
+
+      notifyListeners(); 
     });
   }
 
-  Future<void> sendCalibrate() async {
-    if (_characteristic == null || _currentState != BleConnectionState.connected) {
-      throw KneeLifeBleException("No hi ha connexió BLE activa.");
-    }
-    await _characteristic!.write(utf8.encode("CALIBRAR"), withoutResponse: false);
-  }
-
-  Future<void> disconnect() async {
-    _valueSubscription?.cancel();
-    _scanSubscription?.cancel();
-    await _device?.disconnect();
-    _device = null;
-    _characteristic = null;
-    _emitState(BleConnectionState.disconnected);
-  }
-
-  void dispose() {
-    _valueSubscription?.cancel();
-    _scanSubscription?.cancel();
-    _angleController.close();
-    _connectionController.close();
+  // NOM CORREGIT SENSE ACCENTS NI CARÀCTERS IL·LEGALS PER EVITAR L'ERROR DE DART
+  void forcarDesconnexio() {
+    _isConnected = false;
+    _currentState = "Error: S'ha perdut la connexió amb la genollera KneeLife.";
+    notifyListeners();
   }
 }
