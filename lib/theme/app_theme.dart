@@ -1,24 +1,45 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart'; // Importante: esto conecta con Firebase
 
-void main() async {
-  // Estas dos líneas son "mágicas": preparan la app para conectarse a Internet
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(); 
-  
-  runApp(const KneeLifeApp());
-}
+class AppTheme {
+  // Definim els colors principals de KneeLife (Blau, Grisclar i Blanc)
+  static const Color primaryColor = Colors.blue;
+  static const Color backgroundColor = Color(0xfff5f5f5);
 
-class KneeLifeApp extends StatelessWidget {
-  const KneeLifeApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'KneeLife',
-      //theme: AppTheme.lightTheme,
-       // Empezamos siempre por el Login
+  static ThemeData get lightTheme {
+    return ThemeData(
+      primaryColor: primaryColor,
+      scaffoldBackgroundColor: backgroundColor,
+      useMaterial3: true,
+      
+      // Estil dels botons de l'aplicació
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: primaryColor,
+          foregroundColor: Colors.white,
+          minimumSize: const Size(double.infinity, 50),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+      
+      // Estil dels camps de text (com els del Login)
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: primaryColor, width: 2),
+        ),
+      ),
     );
   }
 }
