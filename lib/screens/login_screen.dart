@@ -1,7 +1,46 @@
 import 'package:flutter/material.dart';
+import 'menu_pacient_screen.dart'; // Importem la pantalla a la qual anirem
 
-class LoginScreen extends StatelessWidget {
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  // Els "controladors" serveixen per capturar el text que escriu l'usuari
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+
+  // Funció simulada de login (més endavant es connectarà a Firebase Auth amb un try/catch)
+  void _intentarLogin() {
+    final String email = _emailController.text.trim();
+    final String password = _passwordController.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
+      // Si algun camp està buit, mostrem un avís a baix de tot
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Si us plau, omple tots els camps")),
+      );
+      return;
+    }
+
+    // De moment, com que estem fent proves i no volem dependre de registrar usuaris
+    // a la base de dades a cada moment, si posen qualsevol dada, passem de pantalla:
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const MenuPacientScreen()),
+    );
+  }
+
+  @override
+  void dispose() {
+    // Netegem els controladors de la memòria de l'ordinador quan sortim de la pantalla
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -11,7 +50,7 @@ class LoginScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Logo de la rodillera inteligente
+            // Logo de la genollera intel·ligent 
             const Icon(Icons.accessibility_new, size: 80, color: Colors.blue),
             const Text(
               "KneeLife",
@@ -21,30 +60,31 @@ class LoginScreen extends StatelessWidget {
             
             const SizedBox(height: 48),
             
-            // Campo de Email en catalán
-            const TextField(
-              decoration: InputDecoration(
+            // Camp de Email (Ara connectat al controlador)
+            TextField(
+              controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
                 labelText: "Correu electrònic",
                 border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 16),
             
-            // Campo de Contraseña
-            const TextField(
+            // Camp de Contrasenya (Ara connectat al controlador)
+            TextField(
+              controller: _passwordController,
               obscureText: true,
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: "Contrasenya",
                 border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 24),
             
-            // Botón de Iniciar Sesión (Estilo KneeLife)
+            // Botó de Iniciar Sessió actiu
             ElevatedButton(
-              onPressed: () {
-                // Aquí conectaremos con Firebase Auth más adelante
-              },
+              onPressed: _intentarLogin, // Executa la funció de dalt en fer clic
               child: const Text("Iniciar Sessió"),
             ),
           ],
