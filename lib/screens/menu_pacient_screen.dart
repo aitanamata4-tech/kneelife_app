@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
-import 'login_screen.dart'; // Importem el login per poder-hi tornar
+import 'package:firebase_auth/firebase_auth.dart'; // Importem Firebase per fer el logout reactiu
+import 'sessio_screen.dart';
+import 'manual_screen.dart';
+import 'progress_screen.dart';
 
 class MenuPacientScreen extends StatelessWidget {
   const MenuPacientScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // Agafem el color primari directament del vostre AppTheme configurat al main
+    // Agafem el color primari directament de l'AppTheme configurat al main
     final primaryColor = Theme.of(context).primaryColor;
 
     return Scaffold(
@@ -14,15 +17,13 @@ class MenuPacientScreen extends StatelessWidget {
         title: const Text("KneeLife", style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
         actions: [
-          // Botó de tancar sessió actiu
+          // Botó de tancar sessió reactiu
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () {
-              // Ens desplaça cap enrere i esborra l'historial per seguretat perquè torni al Login
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const LoginScreen()),
-              );
+            onPressed: () async {
+              // Cridem a Firebase per tancar sessió. El StreamBuilder del main.dart 
+              // s'adonarà del canvi d'estat immediatament i ens retornarà al Login de forma automàtica.
+              await FirebaseAuth.instance.signOut();
             },
           ),
         ],
@@ -40,37 +41,45 @@ class MenuPacientScreen extends StatelessWidget {
             
             const SizedBox(height: 32),
             
-            // Unim les teves targetes originals amb accions pròpies
+            // TARGETA 1: SESSIÓ D'AVUI (ENLLAÇADA)
             _buildMenuCard(
               context, 
               "Sessió d'Avui", 
               "Comença el teu entrenament", 
               Icons.fitness_center,
               () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Connectant amb la genollera KneeLife... En breu comença l'exercici!")),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SessioScreen()),
                 );
-                // Més endavant, aquí farem: Navigator.push(context, MaterialPageRoute(builder: (context) => const ExerciciScreen()));
               }
             ),
             
+            // TARGETA 2: MANUAL D'EXERCICIS (ENLLAÇADA)
             _buildMenuCard(
               context, 
               "Manual d'Exercicis", 
-              "Consulta com fer cada exercici", 
+              "Consulta com faire cada exercici", 
               Icons.menu_book,
               () {
-                // Acció futura
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ManualScreen()),
+                );
               }
             ),
             
+            // TARGETA 3: EL TEU PROGRÉS (ENLLAÇADA)
             _buildMenuCard(
               context, 
               "El Teu Progrés", 
               "Veure la teva evolució", 
               Icons.show_chart,
               () {
-                // Acció futura
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ProgressScreen()),
+                );
               }
             ),
           ],
@@ -79,7 +88,7 @@ class MenuPacientScreen extends StatelessWidget {
     );
   }
 
-  // Hem afegit la variable 'onTap' perquè cada targeta pugui fer una acció diferent
+  // Giny reutilitzable per les targetes del menú
   Widget _buildMenuCard(BuildContext context, String title, String subtitle, IconData icon, VoidCallback onTap) {
     final primaryColor = Theme.of(context).primaryColor;
 
