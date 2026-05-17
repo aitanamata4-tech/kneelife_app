@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'menu_pacient_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -76,6 +77,13 @@ class _LoginScreenState extends State<LoginScreen> {
         email: _emailLoginController.text.trim(),
         password: _passwordLoginController.text.trim(),
       );
+
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const MenuPacientScreen()), // El nom de la teva pantalla
+    );
+
       // La navegació és reactiva gràcies al StreamBuilder del main.dart
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
@@ -110,6 +118,11 @@ class _LoginScreenState extends State<LoginScreen> {
         email: _emailRegisterController.text.trim(),
         password: _passwordRegisterController.text.trim(),
       );
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const MenuPacientScreen()), 
+    );
 
       // Netegem els camps del registre per seguretat/bona pràctica
       _emailRegisterController.clear();
