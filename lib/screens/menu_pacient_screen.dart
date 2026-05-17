@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart'; // Importem Firebase per fer 
 import 'sessio_screen.dart';
 import 'manual_screen.dart';
 import 'progress_screen.dart';
+import 'login_screen.dart';
 
 class MenuPacientScreen extends StatelessWidget {
   const MenuPacientScreen({super.key});
@@ -24,6 +25,15 @@ class MenuPacientScreen extends StatelessWidget {
               // Cridem a Firebase per tancar sessió. El StreamBuilder del main.dart 
               // s'adonarà del canvi d'estat immediatament i ens retornarà al Login de forma automàtica.
               await FirebaseAuth.instance.signOut();
+
+              if (!context.mounted) return;
+
+              // 2. Tornem a la pantalla de Login fent neteja de la ruta
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginScreen()),
+                (route) => false, // Això esborra l'historial perquè no puguin tirar enrere amb el botó del mòbil
+              );
             },
           ),
         ],
