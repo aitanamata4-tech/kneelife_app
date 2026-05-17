@@ -77,7 +77,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
             ),
             const SizedBox(height: 8),
             
-            // CORREGIT: 'initialValue' per evitar deprecations i afegits Ex 4 i 5
             DropdownButtonFormField<String>(
               initialValue: _selectedExerciseKey,
               decoration: InputDecoration(
@@ -121,7 +120,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
             ),
             const SizedBox(height: 16),
 
-            // GRÀFIC 2: MILLOR RÈCORD HISTÒRIC (BAR CHART)
+            // GRÀFIC 2: MILLOR RÈCORD HISTÒRIC (BAR CHART REFINAT)
             Card(
               color: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -129,14 +128,14 @@ class _ProgressScreenState extends State<ProgressScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: SizedBox(
-                  height: 200,
+                  height: 220, // Una mica més alt per donar espai al text
                   child: _buildBarChart(),
                 ),
               ),
             ),
             const SizedBox(height: 32),
 
-            // ESTADÍSTIQUES RESUM A SOTA
+            // ESTADÍSTIQUES RESUM
             _buildSummaryStats(sortedSessionKeys.length, sortedSessionKeys.isEmpty ? "Cap" : sortedSessionKeys.last),
           ],
         ),
@@ -147,12 +146,13 @@ class _ProgressScreenState extends State<ProgressScreen> {
   Widget _buildLineChart(List<String> sortedKeys) {
     List<FlSpot> spots = [];
 
-    // CORREGIT: Ara llegeix directament l'estructura correcta del vostre JSON de Firebase
     for (int i = 0; i < sortedKeys.length; i++) {
       final sessionData = _sessionHistory[sortedKeys[i]];
-      if (sessionData != null && sessionData['exercici_id'] == _selectedExerciseKey) {
-        if (sessionData['angle_maxim'] != null) {
-          double angle = double.tryParse(sessionData['angle_maxim'].toString()) ?? 0.0;
+      // ARA BUSCA EL NODE DE L'EXERCICI DIRECTAMENT DINS DE LA SESSIÓ
+      if (sessionData != null && sessionData[_selectedExerciseKey] != null) {
+        final exData = sessionData[_selectedExerciseKey];
+        if (exData['angle_maxim'] != null) {
+          double angle = double.tryParse(exData['angle_maxim'].toString()) ?? 0.0;
           spots.add(FlSpot(i.toDouble() + 1, angle));
         }
       }
@@ -201,10 +201,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
   }
 
   Widget _buildBarChart() {
-    // CORREGIT: Mapeig complet per als 5 exercicis en comptes de 3
     Map<String, double> recordsMaxims = {"ex1": 0.0, "ex2": 0.0, "ex3": 0.0, "ex4": 0.0, "ex5": 0.0};
 
-    // CORREGIT: Extracció directa dels rècords segons el vostre JSON real
     _sessionHistory.forEach((_, sessionData) {
       if (sessionData != null && sessionData['exercici_id'] != null && sessionData['angle_maxim'] != null) {
         String id = sessionData['exercici_id'].toString();
@@ -221,36 +219,68 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
     return BarChart(
       BarChartData(
-        alignment: BarChartAlignment.spaceEvenly,
-        maxY: 140,
-        gridData: const FlGridData(show: false),
+        alignment: BarChartAlignment.spaceAround,
+        maxY: 120, 
+        minY: 0,
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          getDrawingHorizontalLine: (value) => FlLine(
+            color: Colors.grey[200]!,
+            strokeWidth: 1,
+          ),
+        ),
         borderData: FlBorderData(show: false),
         titlesData: FlTitlesData(
           topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 30)),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 35, 
+              interval: 30,     
+              getTitlesWidget: (value, meta) {
+                return SideTitleWidget(
+                  axisSide: meta.axisSide,
+                  child: Text(
+                    '${value.toInt()}°',
+                    style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.w500),
+                  ),
+                );
+              },
+            ),
+          ),
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
+              reservedSize: 30, 
               getTitlesWidget: (double value, TitleMeta meta) {
+                String text = '';
                 switch (value.toInt()) {
-                  case 0: return const Text('Ex. 1', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold));
-                  case 1: return const Text('Ex. 2', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold));
-                  case 2: return const Text('Ex. 3', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold));
-                  case 3: return const Text('Ex. 4', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold));
-                  case 4: return const Text('Ex. 5', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold));
-                  default: return const Text('');
+                  case 0: text = 'Ex. 1'; break;
+                  case 1: text = 'Ex. 2'; break;
+                  case 2: text = 'Ex. 3'; break;
+                  case 3: text = 'Ex. 4'; break;
+                  case 4: text = 'Ex. 5'; break;
                 }
+                return SideTitleWidget(
+                  axisSide: meta.axisSide,
+                  space: 8, 
+                  child: Text(
+                    text,
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textDark),
+                  ),
+                );
               },
             ),
           ),
         ),
         barGroups: [
-          BarChartGroupData(x: 0, barRods: [BarChartRodData(toY: recordsMaxims["ex1"]!, color: AppTheme.primaryBlue, width: 14, borderRadius: BorderRadius.circular(4))]),
-          BarChartGroupData(x: 1, barRods: [BarChartRodData(toY: recordsMaxims["ex2"]!, color: AppTheme.lightBlue, width: 14, borderRadius: BorderRadius.circular(4))]),
-          BarChartGroupData(x: 2, barRods: [BarChartRodData(toY: recordsMaxims["ex3"]!, color: const Color(0xFF1976D2), width: 14, borderRadius: BorderRadius.circular(4))]),
-          BarChartGroupData(x: 3, barRods: [BarChartRodData(toY: recordsMaxims["ex4"]!, color: Colors.orange, width: 14, borderRadius: BorderRadius.circular(4))]),
-          BarChartGroupData(x: 4, barRods: [BarChartRodData(toY: recordsMaxims["ex5"]!, color: Colors.teal, width: 14, borderRadius: BorderRadius.circular(4))]),
+          BarChartGroupData(x: 0, barRods: [BarChartRodData(toY: recordsMaxims["ex1"]!, color: AppTheme.primaryBlue, width: 16, borderRadius: const BorderRadius.vertical(top: Radius.circular(4)))]),
+          BarChartGroupData(x: 1, barRods: [BarChartRodData(toY: recordsMaxims["ex2"]!, color: AppTheme.lightBlue, width: 16, borderRadius: const BorderRadius.vertical(top: Radius.circular(4)))]),
+          BarChartGroupData(x: 2, barRods: [BarChartRodData(toY: recordsMaxims["ex3"]!, color: const Color(0xFF1976D2), width: 16, borderRadius: const BorderRadius.vertical(top: Radius.circular(4)))]),
+          BarChartGroupData(x: 3, barRods: [BarChartRodData(toY: recordsMaxims["ex4"]!, color: Colors.orange, width: 16, borderRadius: const BorderRadius.vertical(top: Radius.circular(4)))]),
+          BarChartGroupData(x: 4, barRods: [BarChartRodData(toY: recordsMaxims["ex5"]!, color: Colors.teal, width: 16, borderRadius: const BorderRadius.vertical(top: Radius.circular(4)))]),
         ],
       ),
     );
