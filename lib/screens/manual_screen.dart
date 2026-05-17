@@ -26,7 +26,7 @@ class ManualScreen extends StatelessWidget {
       {
         "titol": "4. Flexió de Genoll en Bipedestació",
         "descripcio": "Dret, agafat a una taula o cadira per no perdre l'equilibri. Doblega el genoll cap enrere intentant portar el taló cap al gluti, sans moure la cuixa.",
-        "url_imatge": "https://images.unsplash.com/photo-1597452344418-2993132cc975?auto=format&fit=crop&w=600&q=80",
+        "url_imatge": "https://images.unsplash.com/photo-1574680096145-d05b474e2155?auto=format&fit=crop&w=600&q=80",
       },
       {
         "titol": "5. Extensió de Genoll Assegut",

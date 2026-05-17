@@ -57,7 +57,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
       );
     }
 
-    // Ordenem les sessions cronològicament (sessio1, sessio2...) exigit per la spec
+    // Ordenem les sessions cronològicament (sessio1, sessio2...)
     final sortedSessionKeys = _sessionHistory.keys.toList()
       ..sort((a, b) => a.compareTo(b));
 
@@ -77,7 +77,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
             ),
             const SizedBox(height: 8),
             
-            // CORREGIT: 'initialValue' en comptes de 'value' per evitar obsolescència (deprecation)
+            // CORREGIT: 'initialValue' per evitar deprecations i afegits Ex 4 i 5
             DropdownButtonFormField<String>(
               initialValue: _selectedExerciseKey,
               decoration: InputDecoration(
@@ -89,6 +89,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 DropdownMenuItem(value: "ex1", child: Text("Exercici 1 — Lliscament de Taló")),
                 DropdownMenuItem(value: "ex2", child: Text("Exercici 2 — Extensió en Arc Curt")),
                 DropdownMenuItem(value: "ex3", child: Text("Exercici 3 — Sentadilles Assistides")),
+                DropdownMenuItem(value: "ex4", child: Text("Exercici 4 — Flexió en Bipedestació")),
+                DropdownMenuItem(value: "ex5", child: Text("Exercici 5 — Extensió Assegut")),
               ],
               onChanged: (value) {
                 if (value != null) {
@@ -145,18 +147,12 @@ class _ProgressScreenState extends State<ProgressScreen> {
   Widget _buildLineChart(List<String> sortedKeys) {
     List<FlSpot> spots = [];
 
+    // CORREGIT: Ara llegeix directament l'estructura correcta del vostre JSON de Firebase
     for (int i = 0; i < sortedKeys.length; i++) {
       final sessionData = _sessionHistory[sortedKeys[i]];
-      if (sessionData != null && sessionData['exercicis'] != null) {
-        final List<dynamic> exercicis = sessionData['exercicis'];
-        
-        final exerciciFiltrat = exercicis.firstWhere(
-          (e) => e != null && e['id'] == _selectedExerciseKey,
-          orElse: () => null,
-        );
-
-        if (exerciciFiltrat != null && exerciciFiltrat['angleMaxim'] != null) {
-          double angle = double.tryParse(exerciciFiltrat['angleMaxim'].toString()) ?? 0.0;
+      if (sessionData != null && sessionData['exercici_id'] == _selectedExerciseKey) {
+        if (sessionData['angle_maxim'] != null) {
+          double angle = double.tryParse(sessionData['angle_maxim'].toString()) ?? 0.0;
           spots.add(FlSpot(i.toDouble() + 1, angle));
         }
       }
@@ -196,7 +192,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
             dotData: const FlDotData(show: true),
             belowBarData: BarAreaData(
               show: true,
-              // CORREGIT: Ús de .withValues per evitar pèrdua de precisió en versions modernes de Flutter
               color: AppTheme.primaryBlue.withValues(alpha: 0.2),
             ),
           ),
@@ -206,19 +201,16 @@ class _ProgressScreenState extends State<ProgressScreen> {
   }
 
   Widget _buildBarChart() {
-    Map<String, double> recordsMaxims = {"ex1": 0.0, "ex2": 0.0, "ex3": 0.0};
+    // CORREGIT: Mapeig complet per als 5 exercicis en comptes de 3
+    Map<String, double> recordsMaxims = {"ex1": 0.0, "ex2": 0.0, "ex3": 0.0, "ex4": 0.0, "ex5": 0.0};
 
+    // CORREGIT: Extracció directa dels rècords segons el vostre JSON real
     _sessionHistory.forEach((_, sessionData) {
-      if (sessionData != null && sessionData['exercicis'] != null) {
-        final List<dynamic> exercicis = sessionData['exercicis'];
-        for (var ex in exercicis) {
-          if (ex != null && ex['id'] != null && ex['angleMaxim'] != null) {
-            String id = ex['id'].toString();
-            double angle = double.tryParse(ex['angleMaxim'].toString()) ?? 0.0;
-            if (recordsMaxims.containsKey(id) && angle > recordsMaxims[id]!) {
-              recordsMaxims[id] = angle;
-            }
-          }
+      if (sessionData != null && sessionData['exercici_id'] != null && sessionData['angle_maxim'] != null) {
+        String id = sessionData['exercici_id'].toString();
+        double angle = double.tryParse(sessionData['angle_maxim'].toString()) ?? 0.0;
+        if (recordsMaxims.containsKey(id) && angle > recordsMaxims[id]!) {
+          recordsMaxims[id] = angle;
         }
       }
     });
@@ -233,7 +225,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
         maxY: 140,
         gridData: const FlGridData(show: false),
         borderData: FlBorderData(show: false),
-        // CORREGIT: Agrupats correctament tots els títols dins de titlesData segons la nova versió de fl_chart
         titlesData: FlTitlesData(
           topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -243,9 +234,11 @@ class _ProgressScreenState extends State<ProgressScreen> {
               showTitles: true,
               getTitlesWidget: (double value, TitleMeta meta) {
                 switch (value.toInt()) {
-                  case 0: return const Text('Ex. 1', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold));
-                  case 1: return const Text('Ex. 2', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold));
-                  case 2: return const Text('Ex. 3', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold));
+                  case 0: return const Text('Ex. 1', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold));
+                  case 1: return const Text('Ex. 2', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold));
+                  case 2: return const Text('Ex. 3', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold));
+                  case 3: return const Text('Ex. 4', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold));
+                  case 4: return const Text('Ex. 5', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold));
                   default: return const Text('');
                 }
               },
@@ -253,9 +246,11 @@ class _ProgressScreenState extends State<ProgressScreen> {
           ),
         ),
         barGroups: [
-          BarChartGroupData(x: 0, barRods: [BarChartRodData(toY: recordsMaxims["ex1"]!, color: AppTheme.primaryBlue, width: 22, borderRadius: BorderRadius.circular(4))]),
-          BarChartGroupData(x: 1, barRods: [BarChartRodData(toY: recordsMaxims["ex2"]!, color: AppTheme.lightBlue, width: 22, borderRadius: BorderRadius.circular(4))]),
-          BarChartGroupData(x: 2, barRods: [BarChartRodData(toY: recordsMaxims["ex3"]!, color: const Color(0xFF1976D2), width: 22, borderRadius: BorderRadius.circular(4))]),
+          BarChartGroupData(x: 0, barRods: [BarChartRodData(toY: recordsMaxims["ex1"]!, color: AppTheme.primaryBlue, width: 14, borderRadius: BorderRadius.circular(4))]),
+          BarChartGroupData(x: 1, barRods: [BarChartRodData(toY: recordsMaxims["ex2"]!, color: AppTheme.lightBlue, width: 14, borderRadius: BorderRadius.circular(4))]),
+          BarChartGroupData(x: 2, barRods: [BarChartRodData(toY: recordsMaxims["ex3"]!, color: const Color(0xFF1976D2), width: 14, borderRadius: BorderRadius.circular(4))]),
+          BarChartGroupData(x: 3, barRods: [BarChartRodData(toY: recordsMaxims["ex4"]!, color: Colors.orange, width: 14, borderRadius: BorderRadius.circular(4))]),
+          BarChartGroupData(x: 4, barRods: [BarChartRodData(toY: recordsMaxims["ex5"]!, color: Colors.teal, width: 14, borderRadius: BorderRadius.circular(4))]),
         ],
       ),
     );
@@ -265,7 +260,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        // CORREGIT: També actualitzat amb .withValues aquí
         color: AppTheme.primaryBlue.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
       ),
