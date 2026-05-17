@@ -25,7 +25,6 @@ class _SessioScreenState extends State<SessioScreen> {
   int _selectedPainLevel = 5; 
   bool _isSavingFirebase = false;
 
-  // COMPTATGE ADAPTATIU I CLINICAMENT COMPASSIU
   int _localRepetitions = 0;
   bool _haPassatObjectiu = false;
 
@@ -56,30 +55,29 @@ class _SessioScreenState extends State<SessioScreen> {
   }
 
   void _startBluetoothWatcher() {
-    // Sincronitzat a 50ms amb l'ESP32 per a un moviment en temps real totalment continu
     _interfaceUpdater = Timer.periodic(const Duration(milliseconds: 50), (timer) {
-      final bleService = context.read<BleService>();
+      // Forcem la lectura directa del servei actiu sense bloquejar el flux de renderització
+      final bleService = Provider.of<BleService>(context, listen: false);
       
       if (bleService.isConnected) {
-        if (_currentPhase == SessioPhase.exercici) {
-          final double angleActual = bleService.currentAngle;
+        double angleActual = bleService.currentAngle;
 
-          // Guardem el pic real maxxim que flexiona el pacient de veritat (ex: els 45 graus)
+        if (_currentPhase == SessioPhase.exercici) {
+          if (angleActual > 140.0) {
+            angleActual = 0.0; 
+          }
+
           if (angleActual > _maxAngleAssolit) {
             _maxAngleAssolit = angleActual;
           }
 
-          // LÒGICA DE RECOMPTE ADAPTATIVA:
-          // 1. El pacient inicia la flexió i supera un llindar funcional de seguretat (25°) 
-          // per registrar intenció, sense obligar-lo a arribar al límit del metge si no pot.
           if (angleActual >= 25.0 && !_haPassatObjectiu) {
             _haPassatObjectiu = true;
           }
           
-          // 2. La repetició es valida quan la cama torna a estar estirada (< 22°)
           if (_haPassatObjectiu && angleActual < 22.0) {
             _localRepetitions += 1;
-            _haPassatObjectiu = false; // Reset per a la pròxima flexió
+            _haPassatObjectiu = false; 
 
             if (_localRepetitions >= _totalRepsExigides) {
               _onExerciseComplete();
@@ -92,6 +90,7 @@ class _SessioScreenState extends State<SessioScreen> {
         }
       }
       
+      // Forcem l'actualització de la interfície de Flutter
       if (mounted) setState(() {});
     });
   }
@@ -170,7 +169,7 @@ class _SessioScreenState extends State<SessioScreen> {
       await firebaseService.pujarSessio(
         exerciciId: "ex${_currentExerciseIndex + 1}",
         repeticionsFetes: _totalRepsExigides,
-        angleMaxim: _maxAngleAssolit, // Puja el pic real assolit (ex: 45)
+        angleMaxim: _maxAngleAssolit, 
         nivellDolor: _selectedPainLevel,
       );
 
@@ -218,7 +217,7 @@ class _SessioScreenState extends State<SessioScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: bleService.isConnected ? Colors.green.withValues(alpha: 0.1) : Colors.orange.withValues(alpha: 0.1),
+                color: bleService.isConnected ? Colors.green.withAlpha(25) : Colors.orange.withAlpha(25),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
@@ -264,7 +263,9 @@ class _SessioScreenState extends State<SessioScreen> {
         );
 
       case SessioPhase.exercici:
-        final double alpha = bleService.currentAngle;
+        double alpha = bleService.currentAngle;
+        if (alpha > 140.0) alpha = 0.0; 
+
         final int currentReps = _localRepetitions; 
 
         Color angleColor = AppTheme.errorRed;
