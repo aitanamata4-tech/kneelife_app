@@ -1,6 +1,6 @@
+/build/
 .dart_tool/
-.buildlog/
-build/
+.packages
 
 gradle-wrapper.jar
 /.gradle

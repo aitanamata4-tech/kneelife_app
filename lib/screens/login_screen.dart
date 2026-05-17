@@ -66,6 +66,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  // MÈTODE PER INICIAR SESSIÓ
   Future<void> _login() async {
     if (!_formKeyLogin.currentState!.validate()) return;
 
@@ -77,10 +78,10 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       // La navegació és reactiva gràcies al StreamBuilder del main.dart
     } on FirebaseAuthException catch (e) {
-      if (!mounted) return; // Protecció contra l'async gap
+      if (!mounted) return;
       _showErrorSnackBar(e.code);
     } catch (e) {
-      if (!mounted) return; // Protecció contra l'async gap
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Error inesperat de connexió.")),
       );
@@ -89,6 +90,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  // MÈTODE PER REGISTRAR-SE (Inicia sessió automàticament en crear el compte)
   Future<void> _register() async {
     if (!_formKeyRegister.currentState!.validate()) return;
     if (_passwordRegisterController.text != _confirmPasswordController.text) {
@@ -103,15 +105,25 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = true);
     try {
+      // Això crea l'usuari i alhora l'autentica directament al Firebase
       await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: _emailRegisterController.text.trim(),
         password: _passwordRegisterController.text.trim(),
       );
+
+      // Netegem els camps del registre per seguretat/bona pràctica
+      _emailRegisterController.clear();
+      _passwordRegisterController.clear();
+      _confirmPasswordController.clear();
+
+      // El StreamBuilder del teu main.dart detectarà el nou usuari 
+      // i us redirigirà directament a la pantalla principal (Home).
+
     } on FirebaseAuthException catch (e) {
-      if (!mounted) return; // Protecció contra l'async gap
+      if (!mounted) return;
       _showErrorSnackBar(e.code);
     } catch (e) {
-      if (!mounted) return; // Protecció contra l'async gap
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Error inesperat en crear el compte.")),
       );
