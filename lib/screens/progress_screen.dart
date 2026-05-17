@@ -120,7 +120,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
             ),
             const SizedBox(height: 16),
 
-            // GRÀFIC 2: MILLOR RÈCORD HISTÒRIC (BAR CHART REFINAT)
+            // GRÀFIC 2: MILLOR RÈCORD HISTÒRIC (BAR CHART)
             Card(
               color: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -128,7 +128,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: SizedBox(
-                  height: 220, // Una mica més alt per donar espai al text
+                  height: 220,
                   child: _buildBarChart(),
                 ),
               ),
@@ -148,7 +148,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
     for (int i = 0; i < sortedKeys.length; i++) {
       final sessionData = _sessionHistory[sortedKeys[i]];
-      // ARA BUSCA EL NODE DE L'EXERCICI DIRECTAMENT DINS DE LA SESSIÓ
       if (sessionData != null && sessionData[_selectedExerciseKey] != null) {
         final exData = sessionData[_selectedExerciseKey];
         if (exData['angle_maxim'] != null) {
@@ -204,12 +203,15 @@ class _ProgressScreenState extends State<ProgressScreen> {
     Map<String, double> recordsMaxims = {"ex1": 0.0, "ex2": 0.0, "ex3": 0.0, "ex4": 0.0, "ex5": 0.0};
 
     _sessionHistory.forEach((_, sessionData) {
-      if (sessionData != null && sessionData['exercici_id'] != null && sessionData['angle_maxim'] != null) {
-        String id = sessionData['exercici_id'].toString();
-        double angle = double.tryParse(sessionData['angle_maxim'].toString()) ?? 0.0;
-        if (recordsMaxims.containsKey(id) && angle > recordsMaxims[id]!) {
-          recordsMaxims[id] = angle;
-        }
+      if (sessionData != null) {
+        recordsMaxims.forEach((exerciseKey, currentMax) {
+          if (sessionData[exerciseKey] != null && sessionData[exerciseKey]['angle_maxim'] != null) {
+            double angle = double.tryParse(sessionData[exerciseKey]['angle_maxim'].toString()) ?? 0.0;
+            if (angle > currentMax) {
+              recordsMaxims[exerciseKey] = angle;
+            }
+          }
+        });
       }
     });
 

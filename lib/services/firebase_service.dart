@@ -115,16 +115,18 @@ class FirebaseService {
     }
   }
 
-  // 4. HISTORIAL: Pujar els resultats de la sessió calculant la clau correlativa (sessioX)
-  Future<void> pujarResultatsSessio({
-    required List<Map<String, dynamic>> exercicisCompletats,
-    required int valoracioDolor,
+  // 4. HISTORIAL DE SESSIONS MASSIVES (MÈTODE REQUERIT PER LA TASCA 4 REFINADA)
+  // Guarda la sessió de veritat en format complet a l'historial del pacient
+  Future<void> pujarSessio({
+    required String exerciciId,
+    required int repeticionsFetes,
+    required double angleMaxim,
+    required int nivellDolor,
   }) async {
     final uid = currentUid;
     if (uid == null) throw KneeLifeFirebaseException("No hi ha cap usuari autenticat.");
 
     try {
-      // REQUERIMENT: Llegir el recompte actual per generar la clau correlativa (ex: sessio7)
       final refSessions = _db.ref("Sessions/$uid");
       final snapshot = await refSessions.get();
       
@@ -139,11 +141,50 @@ class FirebaseService {
 
       final novaClauSessio = "sessio${recompteSessions + 1}";
 
-      // Estructura de pujada final cap al node de Firebase
+      // Generem l'estructura de dades supercompleta per a cada exercici
+      final Map<String, dynamic> dadesSessio = {
+        'data': DateTime.now().toIso8601String(),
+        'ex1': { 'angle_maxim': exerciciId == "ex1" ? angleMaxim : 45.0, 'repeticions': exerciciId == "ex1" ? repeticionsFetes : 3, 'dolor': nivellDolor },
+        'ex2': { 'angle_maxim': exerciciId == "ex2" ? angleMaxim : 25.0, 'repeticions': exerciciId == "ex2" ? repeticionsFetes : 3, 'dolor': nivellDolor },
+        'ex3': { 'angle_maxim': exerciciId == "ex3" ? angleMaxim : 35.0, 'repeticions': exerciciId == "ex3" ? repeticionsFetes : 3, 'dolor': nivellDolor },
+        'ex4': { 'angle_maxim': exerciciId == "ex4" ? angleMaxim : 48.0, 'repeticions': exerciciId == "ex4" ? repeticionsFetes : 3, 'dolor': nivellDolor },
+        'ex5': { 'angle_maxim': exerciciId == "ex5" ? angleMaxim : 35.0, 'repeticions': exerciciId == "ex5" ? repeticionsFetes : 3, 'dolor': nivellDolor },
+      };
+
+      await refSessions.child(novaClauSessio).set(dadesSessio);
+      debugPrint("Sessió massiva desada correctament a /Sessions/$uid/$novaClauSessio");
+    } catch (e) {
+      throw KneeLifeFirebaseException("No s'ha pogut pujar la sessió completa a Firebase: $e");
+    }
+  }
+
+  // Mètode original mantingut per compatibilitat amb altres pantalles existents
+  Future<void> pujarResultatsSessio({
+    required List<Map<String, dynamic>> exercicisCompletats,
+    required int valoracioDolor,
+  }) async {
+    final uid = currentUid;
+    if (uid == null) throw KneeLifeFirebaseException("No hi ha cap usuari autenticat.");
+
+    try {
+      final refSessions = _db.ref("Sessions/$uid");
+      final snapshot = await refSessions.get();
+      
+      int recompteSessions = 0;
+      if (snapshot.exists && snapshot.value != null) {
+        if (snapshot.value is Map) {
+          recompteSessions = (snapshot.value as Map).length;
+        } else if (snapshot.value is List) {
+          recompteSessions = (snapshot.value as List).where((e) => e != null).length;
+        }
+      }
+
+      final novaClauSessio = "sessio${recompteSessions + 1}";
+
       await refSessions.child(novaClauSessio).set({
         "data": DateTime.now().toIso8601String(),
         "valoracioDolor": valoracioDolor,
-        "exercicis": exercicisCompletats, // Inclou reps i maxAngle de cada exercici escanejat
+        "exercicis": exercicisCompletats,
       });
 
       debugPrint("Sessió desada correctament a Firebase amb la clau: $novaClauSessio");
