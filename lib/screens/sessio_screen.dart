@@ -20,13 +20,12 @@ class _SessioScreenState extends State<SessioScreen> {
   int _currentExerciseIndex = 0; 
   final int _totalRepsExigides = 3; 
   
-  // L'angle objectiu ara és dinàmic i s'adaptarà al pacient
   double _angleObjectiuDinamic = 45.0; 
   double _maxAngleAssolit = 0.0;
   int _selectedPainLevel = 5; 
   bool _isSavingFirebase = false;
 
-  // COMPTATGE 100% BLINDAT I BASAT EN FILTRE CLÍNIC
+  // COMPTATGE ADAPTATIU I CLINICAMENT COMPASSIU
   int _localRepetitions = 0;
   bool _haPassatObjectiu = false;
 
@@ -51,35 +50,36 @@ class _SessioScreenState extends State<SessioScreen> {
       }
     } catch (_) {
       setState(() {
-        _angleObjectiuDinamic = 45.0; // Resguard clínic si no hi ha Internet
+        _angleObjectiuDinamic = 45.0; 
       });
     }
   }
 
   void _startBluetoothWatcher() {
-    // Escitem el sensor cada 150ms per processar els angles fluids de l'ESP32
-    _interfaceUpdater = Timer.periodic(const Duration(milliseconds: 150), (timer) {
+    // Sincronitzat a 50ms amb l'ESP32 per a un moviment en temps real totalment continu
+    _interfaceUpdater = Timer.periodic(const Duration(milliseconds: 50), (timer) {
       final bleService = context.read<BleService>();
       
       if (bleService.isConnected) {
         if (_currentPhase == SessioPhase.exercici) {
           final double angleActual = bleService.currentAngle;
 
-          // Guardem el pic màxim que flexiona el pacient de veritat
+          // Guardem el pic real maxxim que flexiona el pacient de veritat (ex: els 45 graus)
           if (angleActual > _maxAngleAssolit) {
             _maxAngleAssolit = angleActual;
           }
 
-          // LÒGICA DE RECOMPTE CLÍNIC:
-          // 1. El pacient flexiona i supera l'angle objectiu del metge (Ex: 45°)
-          if (angleActual >= _angleObjectiuDinamic && !_haPassatObjectiu) {
+          // LÒGICA DE RECOMPTE ADAPTATIVA:
+          // 1. El pacient inicia la flexió i supera un llindar funcional de seguretat (25°) 
+          // per registrar intenció, sense obligar-lo a arribar al límit del metge si no pot.
+          if (angleActual >= 25.0 && !_haPassatObjectiu) {
             _haPassatObjectiu = true;
           }
           
-          // 2. La repetició es valida quan la cama torna a la posició estirada (< 22°)
+          // 2. La repetició es valida quan la cama torna a estar estirada (< 22°)
           if (_haPassatObjectiu && angleActual < 22.0) {
             _localRepetitions += 1;
-            _haPassatObjectiu = false; // Netegem el flag per a la pròxima flexió
+            _haPassatObjectiu = false; // Reset per a la pròxima flexió
 
             if (_localRepetitions >= _totalRepsExigides) {
               _onExerciseComplete();
@@ -125,7 +125,6 @@ class _SessioScreenState extends State<SessioScreen> {
   }
 
   void _onExerciseComplete() {
-    // FRENA EL TEMPORITZADOR: Atura en sec el corrent elèctric del Bluetooth per evitar congelacions
     _interfaceUpdater?.cancel();
 
     showDialog(
@@ -149,7 +148,6 @@ class _SessioScreenState extends State<SessioScreen> {
 
   void _advanceExercise() {
     setState(() {
-      // RESET TOTAL DE MEMÒRIA: Buidem els buffers per rebre la següent ràfega de l'ESP32
       _localRepetitions = 0; 
       _haPassatObjectiu = false;
       _maxAngleAssolit = 0.0;
@@ -159,7 +157,6 @@ class _SessioScreenState extends State<SessioScreen> {
         _currentPhase = SessioPhase.questionnaire;
       } else {
         _carregarObjectiuClinic(); 
-        // Re-arranquem el canal Bluetooth totalment de zero i net per al nou exercici
         _startBluetoothWatcher();
       }
     });
@@ -173,7 +170,7 @@ class _SessioScreenState extends State<SessioScreen> {
       await firebaseService.pujarSessio(
         exerciciId: "ex${_currentExerciseIndex + 1}",
         repeticionsFetes: _totalRepsExigides,
-        angleMaxim: _maxAngleAssolit, 
+        angleMaxim: _maxAngleAssolit, // Puja el pic real assolit (ex: 45)
         nivellDolor: _selectedPainLevel,
       );
 
