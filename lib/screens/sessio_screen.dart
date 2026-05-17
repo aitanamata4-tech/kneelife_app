@@ -26,10 +26,9 @@ class _SessioScreenState extends State<SessioScreen> {
   int _selectedPainLevel = 5; 
   bool _isSavingFirebase = false;
 
-  // LÒGICA DE COMPTATGE INTEL·LIGENT (ANTI-CONGELACIÓ DE SENSOR)
+  // COMPTATGE 100% BLINDAT I BASAT EN FILTRE CLÍNIC
   int _localRepetitions = 0;
-  double _lastReadAngle = 0.0;
-  bool _movimentEnAscens = false;
+  bool _haPassatObjectiu = false;
 
   bool _isDisconnectDialogShown = false;
   Timer? _interfaceUpdater;
@@ -41,7 +40,6 @@ class _SessioScreenState extends State<SessioScreen> {
     _startBluetoothWatcher();
   }
 
-  // Llegeix l'objectiu real que té el pacient assignat a la base de dades
   Future<void> _carregarObjectiuClinic() async {
     try {
       final firebaseService = context.read<FirebaseService>();
@@ -52,14 +50,14 @@ class _SessioScreenState extends State<SessioScreen> {
         });
       }
     } catch (_) {
-      // CORREGIT: Eliminat el punt i coma intern que trencava la sintaxi
       setState(() {
-        _angleObjectiuDinamic = 45.0;
+        _angleObjectiuDinamic = 45.0; // Resguard clínic si no hi ha Internet
       });
     }
   }
 
   void _startBluetoothWatcher() {
+    // Escitem el sensor cada 150ms per processar els angles fluids de l'ESP32
     _interfaceUpdater = Timer.periodic(const Duration(milliseconds: 150), (timer) {
       final bleService = context.read<BleService>();
       
@@ -67,30 +65,26 @@ class _SessioScreenState extends State<SessioScreen> {
         if (_currentPhase == SessioPhase.exercici) {
           final double angleActual = bleService.currentAngle;
 
-          // 1. Guardem el rècord absolut de la flexió
+          // Guardem el pic màxim que flexiona el pacient de veritat
           if (angleActual > _maxAngleAssolit) {
             _maxAngleAssolit = angleActual;
           }
 
-          // 2. ALGORISME ANTI-ENCALLAMENT (Filtre de pic de moviment)
-          // Detectem si la cama està pujant
-          if (angleActual > _lastReadAngle + 1.5) {
-            _movimentEnAscens = true;
-          } 
-          // Si el sensor comença a baixar o s'atura bruscament (canvi de tendència > 2°)
-          else if (_movimentEnAscens && angleActual < _lastReadAngle - 1.5) {
-            // Umbral de tolerància per a sensors limitats o mal calibrats
-            if (_lastReadAngle >= 15.0 || _lastReadAngle >= (_angleObjectiuDinamic - 5)) {
-              _localRepetitions += 1;
-              _movimentEnAscens = false;
+          // LÒGICA DE RECOMPTE CLÍNIC:
+          // 1. El pacient flexiona i supera l'angle objectiu del metge (Ex: 45°)
+          if (angleActual >= _angleObjectiuDinamic && !_haPassatObjectiu) {
+            _haPassatObjectiu = true;
+          }
+          
+          // 2. La repetició es valida quan la cama torna a la posició estirada (< 22°)
+          if (_haPassatObjectiu && angleActual < 22.0) {
+            _localRepetitions += 1;
+            _haPassatObjectiu = false; // Netegem el flag per a la pròxima flexió
 
-              if (_localRepetitions >= _totalRepsExigides) {
-                _onExerciseComplete();
-              }
+            if (_localRepetitions >= _totalRepsExigides) {
+              _onExerciseComplete();
             }
           }
-
-          _lastReadAngle = angleActual;
         }
       } else {
         if (_currentPhase == SessioPhase.exercici) {
@@ -110,8 +104,8 @@ class _SessioScreenState extends State<SessioScreen> {
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
-        title: const Text("Connexió perduda"),
-        content: const Text("S'ha perdut la connexió amb la genollera KneeLife. Reconnecta per no perdre el progrés."),
+        title: const Text("Connexió de seguretat"),
+        content: const Text("S'ha perdut la recepció de dades de la genollera. Comprova que l'ESP32 tingui bateria o prem 'Reconnectar'."),
         actions: [
           TextButton(
             onPressed: () async {
@@ -131,6 +125,7 @@ class _SessioScreenState extends State<SessioScreen> {
   }
 
   void _onExerciseComplete() {
+    // FRENA EL TEMPORITZADOR: Atura en sec el corrent elèctric del Bluetooth per evitar congelacions
     _interfaceUpdater?.cancel();
 
     showDialog(
@@ -154,8 +149,9 @@ class _SessioScreenState extends State<SessioScreen> {
 
   void _advanceExercise() {
     setState(() {
+      // RESET TOTAL DE MEMÒRIA: Buidem els buffers per rebre la següent ràfega de l'ESP32
       _localRepetitions = 0; 
-      _movimentEnAscens = false;
+      _haPassatObjectiu = false;
       _maxAngleAssolit = 0.0;
       _currentExerciseIndex += 1;
 
@@ -163,6 +159,7 @@ class _SessioScreenState extends State<SessioScreen> {
         _currentPhase = SessioPhase.questionnaire;
       } else {
         _carregarObjectiuClinic(); 
+        // Re-arranquem el canal Bluetooth totalment de zero i net per al nou exercici
         _startBluetoothWatcher();
       }
     });
@@ -254,7 +251,7 @@ class _SessioScreenState extends State<SessioScreen> {
                       await bleService.enviarSenyalCalibrar();
                       setState(() {
                         _localRepetitions = 0;
-                        _movimentEnAscens = false;
+                        _haPassatObjectiu = false;
                         _currentPhase = SessioPhase.exercici;
                       });
                     } catch (e) {
@@ -292,7 +289,7 @@ class _SessioScreenState extends State<SessioScreen> {
               "${alpha.toStringAsFixed(1)}°",
               style: TextStyle(fontSize: 72, fontWeight: FontWeight.bold, color: angleColor),
             ),
-            Text("Angle objectiu actual: ${_angleObjectiuDinamic.toStringAsFixed(0)}°", style: const TextStyle(color: AppTheme.textGrey, fontSize: 16)),
+            Text("Angle objectiu d'aquest exercici: ${_angleObjectiuDinamic.toStringAsFixed(0)}°", style: const TextStyle(color: AppTheme.textGrey, fontSize: 16)),
             const SizedBox(height: 30),
             Text(
               "Repeticions: $currentReps / $_totalRepsExigides", 
@@ -300,7 +297,7 @@ class _SessioScreenState extends State<SessioScreen> {
             ),
             const Spacer(),
             const Text(
-              "Fes el moviment. El sistema intel·ligent detectarà el canvi d'inclinació del sensor.", 
+              "Recepció de dades IMU activa. Flexiona el genoll per moure l'angle.", 
               style: TextStyle(color: Colors.grey, fontSize: 13, fontStyle: FontStyle.italic),
               textAlign: TextAlign.center,
             ),
