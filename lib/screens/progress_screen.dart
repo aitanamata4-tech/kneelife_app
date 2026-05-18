@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -99,7 +100,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
             ),
             const SizedBox(height: 24),
 
-            // GRÀFIC 1: EVOLUCIÓ PER EXERCICI (LINE CHART)
+            // GRÀFIC 1: EVOLUCIÓ PER EXERCICI (LINE CHART CORREGIT)
             Card(
               color: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -163,7 +164,16 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
     return LineChart(
       LineChartData(
-        gridData: const FlGridData(show: true, drawVerticalLine: false),
+        minY: 0,
+        maxY: 120, // Límit adaptat a la flexió clínica de genoll
+        gridData: FlGridData(
+          show: true, 
+          drawVerticalLine: false,
+          getDrawingHorizontalLine: (value) => FlLine(
+            color: Colors.grey[200]!,
+            strokeWidth: 1,
+          ),
+        ),
         titlesData: FlTitlesData(
           rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -172,12 +182,31 @@ class _ProgressScreenState extends State<ProgressScreen> {
             sideTitles: SideTitles(
               showTitles: true,
               interval: 1,
-              getTitlesWidget: (val, _) => Text(val.toInt().toString(), style: const TextStyle(fontSize: 10)),
+              getTitlesWidget: (val, meta) {
+                return SideTitleWidget(
+                  axisSide: meta.axisSide,
+                  space: 4,
+                  child: Text(val.toInt().toString(), style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                );
+              },
             ),
           ),
-          leftTitles: const AxisTitles(
-            axisNameWidget: Text("Angle (°)", style: TextStyle(fontSize: 12, color: Colors.grey)),
-            sideTitles: SideTitles(showTitles: true, reservedSize: 30),
+          leftTitles: AxisTitles(
+            axisNameWidget: const Text("Angle (°)", style: TextStyle(fontSize: 12, color: Colors.grey)),
+            sideTitles: SideTitles(
+              showTitles: true, 
+              reservedSize: 35,
+              interval: 30, // FIXA L'INTERVAL NET DE 30 EN 30 PER EVITAR AMUNTEGAMENTS
+              getTitlesWidget: (value, meta) {
+                return SideTitleWidget(
+                  axisSide: meta.axisSide,
+                  child: Text(
+                    '${value.toInt()}°',
+                    style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.w500),
+                  ),
+                );
+              },
+            ),
           ),
         ),
         borderData: FlBorderData(show: false),
@@ -191,7 +220,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
             dotData: const FlDotData(show: true),
             belowBarData: BarAreaData(
               show: true,
-              color: AppTheme.primaryBlue.withValues(alpha: 0.2),
+              color: AppTheme.primaryBlue.withAlpha(40),
             ),
           ),
         ],
@@ -292,7 +321,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.primaryBlue.withValues(alpha: 0.05),
+        color: AppTheme.primaryBlue.withAlpha(13),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -304,7 +333,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
               Text("$total", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.textDark)),
             ],
           ),
-          const VerticalDivider(color: Colors.grey, thickness: 1),
+          const SizedBox(height: 30, child: VerticalDivider(color: Colors.grey, thickness: 1)),
           Column(
             children: [
               const Text("Última sessió", style: TextStyle(color: Colors.grey, fontSize: 13)),

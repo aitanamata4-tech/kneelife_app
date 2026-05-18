@@ -28,6 +28,7 @@ class _SessioScreenState extends State<SessioScreen> {
   int _localRepetitions = 0;
   bool _haPassatObjectiu = false;
   bool _isDisconnectDialogShown = false;
+  bool _isExerciseFinished = false; 
 
   // Estructures de control dinàmic d'acord amb la base de dades Firebase
   List<String> _llistaExercicisAsignats = []; 
@@ -46,7 +47,6 @@ class _SessioScreenState extends State<SessioScreen> {
       
       if (assignacio != null) {
         setState(() {
-          // Extraiem i ordenem les claus reals del JSON (Ex: ["ex1", "ex2", "ex3", "ex4", "ex5"])
           _llistaExercicisAsignats = assignacio.keys.where((k) => k.startsWith('ex')).toList()..sort();
           
           if (_llistaExercicisAsignats.isNotEmpty && _currentExerciseIndex < _llistaExercicisAsignats.length) {
@@ -58,7 +58,7 @@ class _SessioScreenState extends State<SessioScreen> {
       }
     } catch (_) {
       setState(() {
-        _llistaExercicisAsignats = ["ex1", "ex2", "ex3"]; // Fallback de seguretat
+        _llistaExercicisAsignats = ["ex1", "ex2", "ex3"]; 
         _angleObjectiuDinamic = 45.0; 
         _totalRepsExigides = 3;
       });
@@ -113,12 +113,10 @@ class _SessioScreenState extends State<SessioScreen> {
   }
 
   void _advanceExercise() {
-    // Si la llista encara no ha carregat correctament, evitem el buidat erroni
     if (_llistaExercicisAsignats.isEmpty) return;
 
     String exActualKey = _llistaExercicisAsignats[_currentExerciseIndex];
     
-    // Guardem les mètriques reals d'aquest exercici en memòria abans de passar al següent
     _historialSessioActual[exActualKey] = {
       'angle_maxim': _maxAngleAssolit,
       'repeticions': _localRepetitions,
@@ -128,11 +126,11 @@ class _SessioScreenState extends State<SessioScreen> {
       _localRepetitions = 0; 
       _haPassatObjectiu = false;
       _maxAngleAssolit = 0.0;
+      _isExerciseFinished = false; 
       _currentExerciseIndex += 1;
 
-      // El límit de tancament ja no és un 3 estàtic, és la llargada real del JSON
       if (_currentExerciseIndex >= _llistaExercicisAsignats.length) {
-        _currentPhase = SessioPhase.questionnaire;
+        _currentPhase = SessioPhase.questionnaire; 
       } else {
         _carregarObjectiuClinic(); 
       }
@@ -144,12 +142,10 @@ class _SessioScreenState extends State<SessioScreen> {
     
     setState(() => _isSavingFirebase = true);
     try {
-      // Injectem el nivell de dolor seleccionat a cadascun dels blocs completats
       _historialSessioActual.forEach((key, value) {
         value['dolor'] = _selectedPainLevel;
       });
 
-      // Enviem el mapa net i estructurat directament al servei de Firebase Realtime
       await firebaseService.pujarSessio(
         resultatsExercicis: _historialSessioActual,
         nivellDolorGeneral: _selectedPainLevel,
@@ -172,15 +168,19 @@ class _SessioScreenState extends State<SessioScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Escolta activa i centralitzada dels canvis que emet el BleService
     final bleService = context.watch<BleService>();
 
-    // Execució de l'algorisme de control cinemàtic mitjançant el Provider actiu
     if (bleService.isConnected && _currentPhase == SessioPhase.exercici) {
       double angleActual = bleService.currentAngle;
       if (angleActual > 140.0) angleActual = 0.0;
 
-      if (angleActual > _maxAngleAssolit) {
+      // ═══════════════════════════════════════════════════════════
+      // NOU FILTRE ANTI-PICS DE SOROLL ANATÒMIC
+      // ═══════════════════════════════════════════════════════════
+      // Només acceptem l'angle com a "nou màxim" si és coherent amb l'exercici actual.
+      // Citem un límit lògic de seguretat (Ex: Objectiu + 25 graus com a molt).
+      // Això descarta per complet els salts bojos de 90° o 100° provocats per cables tous.
+      if (angleActual > _maxAngleAssolit && angleActual <= (_angleObjectiuDinamic + 25.0)) {
         _maxAngleAssolit = angleActual;
       }
 
@@ -192,7 +192,8 @@ class _SessioScreenState extends State<SessioScreen> {
         _localRepetitions += 1;
         _haPassatObjectiu = false; 
 
-        if (_localRepetitions >= _totalRepsExigides) {
+        if (_localRepetitions >= _totalRepsExigides && !_isExerciseFinished) {
+          _isExerciseFinished = true; 
           Future.microtask(() => _onExerciseComplete());
         }
       }
@@ -250,6 +251,7 @@ class _SessioScreenState extends State<SessioScreen> {
                       setState(() {
                         _localRepetitions = 0;
                         _haPassatObjectiu = false;
+                        _isExerciseFinished = false; 
                         _currentPhase = SessioPhase.exercici;
                       });
                     } catch (e) {
@@ -272,7 +274,6 @@ class _SessioScreenState extends State<SessioScreen> {
         if (alpha >= 5.0 && alpha < _angleObjectiuDinamic) angleColor = Colors.orange;
         if (alpha >= _angleObjectiuDinamic) angleColor = Colors.green;
 
-        // Nombre total d'exercicis reals extrets de la llista calculada
         final totalExercicis = _llistaExercicisAsignats.isEmpty ? 3 : _llistaExercicisAsignats.length;
 
         return Column(
@@ -280,10 +281,15 @@ class _SessioScreenState extends State<SessioScreen> {
           children: [
             Text("Exercici ${_currentExerciseIndex + 1} de $totalExercicis", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-            LinearProgressIndicator(
-              value: (_currentExerciseIndex + 1) / totalExercicis,
-              backgroundColor: Colors.grey[200],
-              color: AppTheme.primaryBlue,
+            Theme(
+              data: Theme.of(context).copyWith(
+                colorScheme: Theme.of(context).colorScheme.copyWith(primary: AppTheme.primaryBlue)
+              ),
+              child: LinearProgressIndicator(
+                value: (_currentExerciseIndex + 1) / totalExercicis,
+                backgroundColor: Colors.grey[200],
+                color: AppTheme.primaryBlue,
+              ),
             ),
             const SizedBox(height: 40),
             Text(

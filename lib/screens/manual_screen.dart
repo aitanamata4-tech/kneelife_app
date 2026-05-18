@@ -11,27 +11,27 @@ class ManualScreen extends StatelessWidget {
       {
         "titol": "1. Lliscament de Taló (Heel Slides)",
         "descripcio": "Estirat boca amunt, llisca el taló pel llit apropant-lo al gluti de forma lenta i controlada.",
-        "url_imatge": "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?auto=format&fit=crop&w=600&q=80", 
+        "url_imatge": "https://www.shutterstock.com/image-vector/woman-doing-laying-heel-slides-260nw-2275854571.jpg", 
       },
       {
         "titol": "2. Extensió en Arc Curt (Short Arc Quads)",
         "descripcio": "Col·loca un corró o tovallola sota el genoll. Estira la cama completament aixecant el taló i mantén la posició uns segons.",
-        "url_imatge": "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=600&q=80",
+        "url_imatge": "https://www.arthritis-uk.org/media/n5ick14o/short-arc-quad-500x500.jpg",
       },
       {
         "titol": "3. Sentadilles Assistides (Chair Squats)",
         "descripcio": "Agafa't a una cadira o barana estable per seguretat. Baixa el maluc a poc a poc com si t'anessis a seure i torna a pujar.",
-        "url_imatge": "https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=600&q=80",
+        "url_imatge": "https://i0.wp.com/courtneymedicalgroupaz.com/wp-content/uploads/2018/10/img_4642.jpg?fit=960%2C640&ssl=1",
       },
       {
         "titol": "4. Flexió de Genoll en Bipedestació",
         "descripcio": "Dret, agafat a una taula o cadira per no perdre l'equilibri. Doblega el genoll cap enrere intentant portar el taló cap al gluti, sans moure la cuixa.",
-        "url_imatge": "https://images.unsplash.com/photo-1574680096145-d05b474e2155?auto=format&fit=crop&w=600&q=80",
+        "url_imatge": "https://berkmanmd.com/wp-content/uploads/2020/02/flexion-img-1.jpg",
       },
       {
         "titol": "5. Extensió de Genoll Assegut",
         "descripcio": "Seu en una cadira amb l'esquena recta. Estira la cama cap endavant fins a deixar-la completament recta i paral·lela a terra, mantén 2 segons i baixa a poc a poc.",
-        "url_imatge": "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=600&q=80",
+        "url_imatge": "https://traumatologiahellin.wordpress.com/wp-content/uploads/2011/10/flexo-extension-rodillas-sentado.jpg",
       },
     ];
 
