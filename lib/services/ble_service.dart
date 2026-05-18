@@ -13,32 +13,49 @@ class BleService with ChangeNotifier {
   BluetoothCharacteristic? _targetCharacteristic;
   StreamSubscription<List<int>>? _valueSubscription;
   StreamSubscription<List<ScanResult>>? _scanSubscription;
+  StreamSubscription<BluetoothConnectionState>? _connectionStateSubscription;
 
-  // UUIDs exactament iguals als configurats a l'ESP32
-  final String serviceUuid = "4fafc201-1fb5-459e-8fcc-010101010101";
+  // UUIDs EXACTES coincidents amb l'ESP32
+  final String serviceUuid = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
   final String characteristicUuid = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 
-  // Getters que utilitza la teva SessioScreen
   bool get isScanning => _isScanning;
   bool get isConnected => _isConnected;
   double get currentAngle => _currentAngle;
   String get currentState => _currentState;
 
-  // Escaneja l'espai buscant el dispositiu anomenat "KneeLife"
+  // Escaneja l'espai buscant el dispositiu KneeLife de forma segura
   Future<void> startScanning() async {
     if (_isScanning) return;
-    
+
+    // Forcem neteja prèvia per evitar connexions fantasma a Android
+    await _clearPreviousConnection();
+
     _isScanning = true;
     _currentState = "Escanejant buscant KneeLife...";
     notifyListeners();
 
-    // Arrancam l'escaneig físic de l'antena del mòbil durant 5 segons
-    await FlutterBluePlus.startScan(timeout: const Duration(seconds: 5));
-    
+    try {
+      // Arrancam l'escaneig físic de l'antena
+      await FlutterBluePlus.startScan(
+        timeout: const Duration(seconds: 5),
+        withNames: ["KneeLife"], // Filtre a nivell de hardware de l'antena
+      );
+    } catch (e) {
+      _currentState = "Error en iniciar escaneig: $e";
+      _isScanning = false;
+      notifyListeners();
+      return;
+    }
+
+    // Escoltam els resultats de l'escaneig (Tipat esmentat en singular corregit)
     _scanSubscription = FlutterBluePlus.scanResults.listen((results) async {
       for (ScanResult r in results) {
         if (r.device.platformName == "KneeLife" || r.advertisementData.advName == "KneeLife") {
           _targetDevice = r.device;
+          
+          // Cancel·lam l'escaneig immediatament per alliberar la pila de Bluetooth
+          _scanSubscription?.cancel();
           await FlutterBluePlus.stopScan();
           _isScanning = false;
           _currentState = "Genollera trobada. Connectant...";
@@ -48,35 +65,45 @@ class BleService with ChangeNotifier {
           break;
         }
       }
+    }, onError: (error) {
+      _isScanning = false;
+      _currentState = "Error en flux d'escaneig.";
+      notifyListeners();
     });
 
-    // Control de temps per si no la troba
-    await Future.delayed(const Duration(seconds: 5));
-    if (_targetDevice == null) {
-      _isScanning = false;
-      _currentState = "No s'ha trobat cap genollera KneeLife a prop.";
-      notifyListeners();
-    }
+    // Timeout de seguretat si passats 5 segons no s'ha trobat el target
+    Future.delayed(const Duration(seconds: 5), () {
+      if (_isScanning && _targetDevice == null) {
+        FlutterBluePlus.stopScan();
+        _isScanning = false;
+        _currentState = "No s'ha trobat cap genollera KneeLife a prop.";
+        notifyListeners();
+      }
+    });
   }
 
-  // Connecta al xip Bluetooth de l'ESP32
+  // Connecta al xip Bluetooth de l'ESP32 i assegura els canals de comunicació
   Future<void> _connectToDevice() async {
     if (_targetDevice == null) return;
 
     try {
-      await _targetDevice!.connect();
+      // Connexió directa amb autoConnect deshabilitat per evitar esperes infinites
+      await _targetDevice!.connect(autoConnect: false);
       _isConnected = true;
       _currentState = "Genollera connectada. Buscant canals...";
       notifyListeners();
 
-      // Escoltador actiu per si la placa es desconnecta o es queda sense bateria
-      _targetDevice!.connectionState.listen((state) {
+      // Cancel·lam subscripcions d'estat prèvies si existissin
+      await _connectionStateSubscription?.cancel();
+      
+      // Escoltador acollit d'estat de connexió en temps real
+      _connectionStateSubscription = _targetDevice!.connectionState.listen((state) {
         if (state == BluetoothConnectionState.disconnected) {
           _handleDisconnect();
         }
       });
 
-      // Descobrim els serveis i característiques de la placa
+      // Descobrim els serveis del servidor Bluetooth de l'ESP32
       List<BluetoothService> services = await _targetDevice!.discoverServices();
       for (BluetoothService s in services) {
         if (s.uuid.toString().toLowerCase() == serviceUuid.toLowerCase()) {
@@ -84,8 +111,10 @@ class BleService with ChangeNotifier {
             if (c.uuid.toString().toLowerCase() == characteristicUuid.toLowerCase()) {
               _targetCharacteristic = c;
               
-              // Ens subscrivim oficialment al canal de NOTIFY de l'ESP32 (Cada 50ms)
+              // Activem de forma robusta les notificacions (NOTIFY)
               await _targetCharacteristic!.setNotifyValue(true);
+              
+              await _valueSubscription?.cancel();
               _valueSubscription = _targetCharacteristic!.onValueReceived.listen((value) {
                 _processarDadesESP32(value);
               });
@@ -97,36 +126,52 @@ class BleService with ChangeNotifier {
           }
         }
       }
+      
+      // Si surt del bucle sense retornar, el servei o característica no coincideixen
+      _currentState = "Error: Canals de dades no vàlids o incompatibles.";
+      _handleDisconnect();
+
     } catch (e) {
+      _currentState = "Error de connexió física: $e";
       _handleDisconnect();
     }
   }
 
-  // RECEPTOR REAL DE LES DADES DE L'ESP32
+  // RECEPTOR DE DADES OPTIMITZAT CONTRA CARÀCTERS OCULTS
   void _processarDadesESP32(List<int> value) {
+    if (value.isEmpty) return;
     try {
-      // Converteix els bytes de la ràfega Bluetooth a text ASCII (Ex: "34.2,1.2,1")
+      // 1. Convertim els bytes de la ràfega Bluetooth a text ASCII netejant extrems
       String dadaText = utf8.decode(value).trim();
       if (dadaText.isEmpty) return;
 
-      // Escolta si la placa ha respost a l'ordre de calibrar
-      if (dadaText == "CALIBRAT") {
-        _currentState = "Calibratge completat. Pots començar l'exercici.";
+      debugPrint("📡 BYTES REBUTS (TEXT): '$dadaText'");
+
+      if (dadaText.contains("calibrada") || dadaText == "CALIBRAT") {
+        _currentState = "Calibratge completat de forma correcta.";
         notifyListeners();
         return;
       }
 
-      // Tallem el text per la coma [angle, velocitat, calibrat]
-      List<String> parts = dadaText.split(',');
-      if (parts.isNotEmpty) {
-        // Agafem la primera posició que és l'angle de flexió calculat pel filtre de l'ESP32
-        _currentAngle = double.tryParse(parts[0]) ?? _currentAngle;
-        notifyListeners();
+      // 2. NETEJA ABSOLUTA: Eliminem mitjançant Regex qualsevol cosa que no sigui un número o un punt decimal.
+      // Això elimina els \n, \r o micro-basura que l'antena de l'ESP32 acobla al tramat.
+      String textNet = dadaText.replaceAll(RegExp(r'[^0-9.]'), '');
+
+      if (textNet.isNotEmpty) {
+        double? angleParsejat = double.tryParse(textNet);
+        if (angleParsejat != null) {
+          _currentAngle = angleParsejat;
+          notifyListeners(); // Alerta a la SessioScreen de que hi ha un nou angle!
+        } else {
+          debugPrint("⚠️ No s'ha pogut parsejar a double el text netejat: '$textNet'");
+        }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint("🚨 Error en processar trama Bluetooth: $e");
+    }
   }
 
-  // Envia l'ordre real "CALIBRAR" cap a la placa
+  // Envia l'ordre real "CALIBRAR" cap a la placa a través del buffer d'escriptura
   Future<void> enviarSenyalCalibrar() async {
     if (!_isConnected || _targetCharacteristic == null) return;
     
@@ -134,15 +179,32 @@ class BleService with ChangeNotifier {
     notifyListeners();
 
     try {
-      // Escriu directament al buffer de recepció de l'ESP32
-      await _targetCharacteristic!.write(utf8.encode("CALIBRAR"));
-    } catch (_) {
+      // Escrivim al buffer amb resposta per assegurar la recepció a l'ESP32
+      await _targetCharacteristic!.write(utf8.encode("CALIBRAR\n"), withoutResponse: false);
+    } catch (e) {
       _currentState = "Error en enviar el senyal de calibratge.";
       notifyListeners();
+      throw Exception("No s'ha pogut transmetre l'ordre de calibratge.");
     }
   }
 
-  // Neteja de memòria segura si es talla la comunicació
+  // Neteja manual profunda per evitar l'acumulació de sockets fantasmes a Android
+  Future<void> _clearPreviousConnection() async {
+    _valueSubscription?.cancel();
+    _scanSubscription?.cancel();
+    _connectionStateSubscription?.cancel();
+    
+    if (_targetDevice != null) {
+      try {
+        await _targetDevice!.disconnect();
+      } catch (_) {}
+      _targetDevice = null;
+    }
+    _targetCharacteristic = null;
+    _isConnected = false;
+  }
+
+  // Gestió de desconnexió controlada per pèrdua de corrent o allunyaments
   void _handleDisconnect() {
     _isConnected = false;
     _isScanning = false;
@@ -150,14 +212,14 @@ class BleService with ChangeNotifier {
     _targetCharacteristic = null;
     _valueSubscription?.cancel();
     _scanSubscription?.cancel();
+    _connectionStateSubscription?.cancel();
     _currentState = "Error: S'ha perdut la connexió amb la genollera KneeLife.";
     notifyListeners();
   }
 
   @override
   void dispose() {
-    _valueSubscription?.cancel();
-    _scanSubscription?.cancel();
+    _clearPreviousConnection();
     super.dispose();
   }
 }

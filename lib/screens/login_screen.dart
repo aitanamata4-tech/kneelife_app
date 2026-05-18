@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'menu_pacient_screen.dart';
+import 'menu_pacient_screen.dart'; // Reincorporat per a la navegació directa
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -35,7 +35,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   // Mètode per gestionar els errors de Firebase en Català
-  void _showErrorSnackBar(String code) {
+  void _showErrorSnackBar(String code, String fallbackMessage) {
     String message = "S'ha produït un error en l'autenticació.";
     
     switch (code) {
@@ -57,17 +57,27 @@ class _LoginScreenState extends State<LoginScreen> {
       case 'user-disabled':
         message = "Aquest usuari ha estat deshabilitat.";
         break;
+      case 'network-request-failed':
+        message = "Error de xarxa. Comprova la connexió a Internet del mòbil.";
+        break;
+      case 'channel-error':
+        message = "Camps buits o error de comunicació intern.";
+        break;
+      default:
+        message = "Error: $code. $fallbackMessage";
+        break;
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
         backgroundColor: Colors.redAccent,
+        duration: const Duration(seconds: 5),
       ),
     );
   }
 
-  // MÈTODE PER INICIAR SESSIÓ
+  // MÈTODE PER INICIAR SESSIÓ CORREGIT AMB NAVEGACIÓ FORÇADA SEGURA
   Future<void> _login() async {
     if (!_formKeyLogin.currentState!.validate()) return;
 
@@ -78,27 +88,33 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _passwordLoginController.text.trim(),
       );
 
+      debugPrint("🎉 Firebase Auth: Login correcte de credencials.");
+
+      // Esperem 300 milisegons per donar temps al sistema a digerir el token
+      await Future.delayed(const Duration(milliseconds: 300));
+
       if (!mounted) return;
+      
+      // Forcem la navegació manual directa saltant qualsevol bucle de StreamBuilder
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const MenuPacientScreen()), // El nom de la teva pantalla
-    );
+        MaterialPageRoute(builder: (context) => const MenuPacientScreen()),
+      );
 
-      // La navegació és reactiva gràcies al StreamBuilder del main.dart
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
-      _showErrorSnackBar(e.code);
+      _showErrorSnackBar(e.code, e.message ?? "");
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Error inesperat de connexió.")),
+        SnackBar(content: Text("Error inesperat de connexió: $e")),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // MÈTODE PER REGISTRAR-SE (Inicia sessió automàticament en crear el compte)
+  // MÈTODE PER REGISTRAR-SE CORREGIT AMB NAVEGACIÓ FORÇADA SEGURA
   Future<void> _register() async {
     if (!_formKeyRegister.currentState!.validate()) return;
     if (_passwordRegisterController.text != _confirmPasswordController.text) {
@@ -113,32 +129,35 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = true);
     try {
-      // Això crea l'usuari i alhora l'autentica directament al Firebase
       await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: _emailRegisterController.text.trim(),
         password: _passwordRegisterController.text.trim(),
       );
+
+      debugPrint("🎉 Firebase Auth: Compte creat de forma correcta.");
+
+      // Esperem 300 milisegons abans d'empènyer la pantalla
+      await Future.delayed(const Duration(milliseconds: 300));
+
       if (!mounted) return;
+
+      // Forcem la navegació manual directa darrere del registre
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const MenuPacientScreen()), 
-    );
+        MaterialPageRoute(builder: (context) => const MenuPacientScreen()),
+      );
 
-      // Netegem els camps del registre per seguretat/bona pràctica
       _emailRegisterController.clear();
       _passwordRegisterController.clear();
       _confirmPasswordController.clear();
 
-      // El StreamBuilder del teu main.dart detectarà el nou usuari 
-      // i us redirigirà directament a la pantalla principal (Home).
-
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
-      _showErrorSnackBar(e.code);
+      _showErrorSnackBar(e.code, e.message ?? "");
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Error inesperat en crear el compte.")),
+        SnackBar(content: Text("Error inesperat en crear el compte: $e")),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);

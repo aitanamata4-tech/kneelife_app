@@ -11,7 +11,7 @@ class KneeLifeFirebaseException implements Exception {
 }
 
 class FirebaseService {
-  // Patrón Singleton exigido por la especificación
+  // Patró Singleton mantingut per especificació
   static final FirebaseService _instance = FirebaseService._internal();
   factory FirebaseService() => _instance;
   FirebaseService._internal();
@@ -21,8 +21,8 @@ class FirebaseService {
 
   String? get currentUid => _auth.currentUser?.uid;
 
-  /// NOTA DE SEGURIDAD PARA EL DESARROLLADOR (REQUERIMIENTO DEL DOCUMENTO):
-  /// Recuerda configurar las reglas de Firebase Realtime Database de la siguiente forma:
+  /// NOTA DE SEGURETAT PER AL DESENVOLUPADOR:
+  /// Recorda configurar les regles de Firebase Realtime Database de la següent forma:
   /// {
   ///   "rules": {
   ///     "Sessions": {
@@ -50,7 +50,7 @@ class FirebaseService {
   ///   }
   /// }
 
-  // 1. GESTIÓN DE USUARIOS: Guardar datos del nuevo usuario al registrarse
+  // 1. GESTIÓ DE USUARIS: Guardar dades del nou usuari al registrar-se
   Future<void> registrarDadesUsuari({required String nom, required String cognom, required String email}) async {
     final uid = currentUid;
     if (uid == null) throw KneeLifeFirebaseException("No hi ha cap usuari autenticat.");
@@ -75,7 +75,6 @@ class FirebaseService {
 
       final List<Map<String, dynamic>> llista = [];
       
-      // Estructura dinàmica de Firebase (pot venir com List o Map)
       if (snapshot.value is List) {
         final listData = snapshot.value as List<dynamic>;
         for (int i = 0; i < listData.length; i++) {
@@ -115,13 +114,12 @@ class FirebaseService {
     }
   }
 
-  // 4. HISTORIAL DE SESSIONS MASSIVES (MÈTODE REQUERIT PER LA TASCA 4 REFINADA)
-  // Guarda la sessió de veritat en format complet a l'historial del pacient
+  // 4. HISTORIAL DE SESSIONS MASSIVES DINÀMIQUES (CORREGIT)
+  // En lloc de sobreescriure amb valors estàtics de prova, rep la llista d'exercicis
+  // reals fets pel pacient i els munta de forma neta per enviar-los a Firebase.
   Future<void> pujarSessio({
-    required String exerciciId,
-    required int repeticionsFetes,
-    required double angleMaxim,
-    required int nivellDolor,
+    required Map<String, Map<String, dynamic>> resultatsExercicis,
+    required int nivellDolorGeneral,
   }) async {
     final uid = currentUid;
     if (uid == null) throw KneeLifeFirebaseException("No hi ha cap usuari autenticat.");
@@ -141,18 +139,22 @@ class FirebaseService {
 
       final novaClauSessio = "sessio${recompteSessions + 1}";
 
-      // Generem l'estructura de dades supercompleta per a cada exercici
+      // Mapegem l'estructura arrel amb la data actual en format ISO
       final Map<String, dynamic> dadesSessio = {
         'data': DateTime.now().toIso8601String(),
-        'ex1': { 'angle_maxim': exerciciId == "ex1" ? angleMaxim : 45.0, 'repeticions': exerciciId == "ex1" ? repeticionsFetes : 3, 'dolor': nivellDolor },
-        'ex2': { 'angle_maxim': exerciciId == "ex2" ? angleMaxim : 25.0, 'repeticions': exerciciId == "ex2" ? repeticionsFetes : 3, 'dolor': nivellDolor },
-        'ex3': { 'angle_maxim': exerciciId == "ex3" ? angleMaxim : 35.0, 'repeticions': exerciciId == "ex3" ? repeticionsFetes : 3, 'dolor': nivellDolor },
-        'ex4': { 'angle_maxim': exerciciId == "ex4" ? angleMaxim : 48.0, 'repeticions': exerciciId == "ex4" ? repeticionsFetes : 3, 'dolor': nivellDolor },
-        'ex5': { 'angle_maxim': exerciciId == "ex5" ? angleMaxim : 35.0, 'repeticions': exerciciId == "ex5" ? repeticionsFetes : 3, 'dolor': nivellDolor },
       };
 
+      // Mapegem de forma dinàmica només els exercicis completats a la pantalla
+      resultatsExercicis.forEach((exId, dades) {
+        dadesSessio[exId] = {
+          'angle_maxim': dades['angle_maxim'],
+          'repeticions': dades['repeticions'],
+          'dolor': dades['dolor'] ?? nivellDolorGeneral,
+        };
+      });
+
       await refSessions.child(novaClauSessio).set(dadesSessio);
-      debugPrint("Sessió massiva desada correctament a /Sessions/$uid/$novaClauSessio");
+      debugPrint("Sessió dinàmica desada correctament a /Sessions/$uid/$novaClauSessio");
     } catch (e) {
       throw KneeLifeFirebaseException("No s'ha pogut pujar la sessió completa a Firebase: $e");
     }

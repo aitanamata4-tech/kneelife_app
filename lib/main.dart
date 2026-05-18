@@ -1,19 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_core/firebase_core.dart'; // Connexió nclosa i activa
-import 'theme/app_theme.dart';
-import 'services/firebase_service.dart';
+
+// Importacions dels teus serveis
 import 'services/ble_service.dart';
-import 'screens/login_screen.dart'; // Pantalla inicial oficial
+import 'services/firebase_service.dart';
+
+// Importacions de les teves pantalles
+import 'screens/login_screen.dart';
+import 'screens/menu_pacient_screen.dart'; // Aquí és on es necessita l'import ara!
+import 'theme/app_theme.dart';
 
 void main() async {
-  // Assegura que els enllaços de Flutter estiguin llestos abans d'iniciar serveis
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(); // Inicialitza Firebase a l'arrancar la app
   
-  // S'inicialitza el motor de Firebase real per a la validació d'usuaris
-  await Firebase.initializeApp(); 
-  
-  runApp(const MyApp());
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => BleService()),
+        Provider(create: (_) => FirebaseService()),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -21,25 +32,31 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        // Injectem el servei d'autenticació i Realtime Database
-        Provider<FirebaseService>(
-          create: (_) => FirebaseService(),
-        ),
-        // Injectem el servei de Bluetooth per a la genollera KneeLife
-        ChangeNotifierProvider<BleService>(
-          create: (_) => BleService(),
-        ),
-      ],
-      child: MaterialApp(
-        title: 'KneeLife',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightTheme, // Estils visuals globals de l'app
-        
-        // REQUISIT RESOLT: L'app arrenca directament al Login real
-        // Firebase comprovarà les credencials i tancarà el pas si es posa qualsevol brossa
-        home: const LoginScreen(), 
+    return MaterialApp(
+      title: 'KneeLife',
+      theme: AppTheme.lightTheme, // El teu tema actual (adapta el nom si és diferent)
+      debugShowCheckedModeBanner: false,
+      
+      // El controlador reactiu que es quedarà escoltant a Firebase en segon pla
+      home: StreamBuilder<User?>(
+        stream: FirebaseAuth.instance.authStateChanges(),
+        builder: (context, snapshot) {
+          
+          // 1. Si Firebase està comprovant la sessió al principi, mostrem el cercle de càrrega
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          
+          // 2. Si l'usuari s'ha loguejat correctament (Snapshot té dades), saltem al menú
+          if (snapshot.hasData && snapshot.data != null) {
+            return const MenuPacientScreen();
+          }
+          
+          // 3. Si no hi ha cap usuari o s'ha tancat sessió, es queda al Login
+          return const LoginScreen();
+        },
       ),
     );
   }
