@@ -17,22 +17,22 @@ class SessioScreen extends StatefulWidget {
 class _SessioScreenState extends State<SessioScreen> {
   SessioPhase _currentPhase = SessioPhase.preparacio;
 
-  int _currentExerciseIndex = 0; 
-  int _totalRepsExigides = 3; 
-  
-  double _angleObjectiuDinamic = 45.0; 
+  int _currentExerciseIndex = 0;
+  int _totalRepsExigides = 3;
+ 
+  double _angleObjectiuDinamic = 45.0;
   double _maxAngleAssolit = 0.0;
-  int _selectedPainLevel = 5; 
+  int _selectedPainLevel = 5;
   bool _isSavingFirebase = false;
 
   int _localRepetitions = 0;
   bool _haPassatObjectiu = false;
   bool _isDisconnectDialogShown = false;
-  bool _isExerciseFinished = false; 
+  bool _isExerciseFinished = false;
 
   // Estructures de control dinàmic d'acord amb la base de dades Firebase
-  List<String> _llistaExercicisAsignats = []; 
-  final Map<String, Map<String, dynamic>> _historialSessioActual = {}; 
+  List<String> _llistaExercicisAsignats = [];
+  final Map<String, Map<String, dynamic>> _historialSessioActual = {};
 
   @override
   void initState() {
@@ -44,11 +44,11 @@ class _SessioScreenState extends State<SessioScreen> {
     try {
       final firebaseService = context.read<FirebaseService>();
       final assignacio = await firebaseService.obtenirAssignacioClinica();
-      
+     
       if (assignacio != null) {
         setState(() {
           _llistaExercicisAsignats = assignacio.keys.where((k) => k.startsWith('ex')).toList()..sort();
-          
+         
           if (_llistaExercicisAsignats.isNotEmpty && _currentExerciseIndex < _llistaExercicisAsignats.length) {
             String exActualKey = _llistaExercicisAsignats[_currentExerciseIndex];
             _angleObjectiuDinamic = double.tryParse(assignacio[exActualKey]['angleObjectiu'].toString()) ?? 45.0;
@@ -58,8 +58,8 @@ class _SessioScreenState extends State<SessioScreen> {
       }
     } catch (_) {
       setState(() {
-        _llistaExercicisAsignats = ["ex1", "ex2", "ex3"]; 
-        _angleObjectiuDinamic = 45.0; 
+        _llistaExercicisAsignats = ["ex1", "ex2", "ex3"];
+        _angleObjectiuDinamic = 45.0;
         _totalRepsExigides = 3;
       });
     }
@@ -116,30 +116,30 @@ class _SessioScreenState extends State<SessioScreen> {
     if (_llistaExercicisAsignats.isEmpty) return;
 
     String exActualKey = _llistaExercicisAsignats[_currentExerciseIndex];
-    
+   
     _historialSessioActual[exActualKey] = {
       'angle_maxim': _maxAngleAssolit,
       'repeticions': _localRepetitions,
     };
 
     setState(() {
-      _localRepetitions = 0; 
+      _localRepetitions = 0;
       _haPassatObjectiu = false;
       _maxAngleAssolit = 0.0;
-      _isExerciseFinished = false; 
+      _isExerciseFinished = false;
       _currentExerciseIndex += 1;
 
       if (_currentExerciseIndex >= _llistaExercicisAsignats.length) {
-        _currentPhase = SessioPhase.questionnaire; 
+        _currentPhase = SessioPhase.questionnaire;
       } else {
-        _carregarObjectiuClinic(); 
+        _carregarObjectiuClinic();
       }
     });
   }
 
   Future<void> _enviarDadesADataubase() async {
     final firebaseService = context.read<FirebaseService>();
-    
+   
     setState(() => _isSavingFirebase = true);
     try {
       _historialSessioActual.forEach((key, value) {
@@ -187,13 +187,13 @@ class _SessioScreenState extends State<SessioScreen> {
       if (angleActual >= _angleObjectiuDinamic && !_haPassatObjectiu) {
         _haPassatObjectiu = true;
       }
-      
+     
       if (_haPassatObjectiu && angleActual < 22.0) {
         _localRepetitions += 1;
-        _haPassatObjectiu = false; 
+        _haPassatObjectiu = false;
 
         if (_localRepetitions >= _totalRepsExigides && !_isExerciseFinished) {
-          _isExerciseFinished = true; 
+          _isExerciseFinished = true;
           Future.microtask(() => _onExerciseComplete());
         }
       }
@@ -243,7 +243,7 @@ class _SessioScreenState extends State<SessioScreen> {
             const SizedBox(height: 16),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryBlue),
-              onPressed: bleService.isConnected 
+              onPressed: bleService.isConnected
                 ? () async {
                     final messenger = ScaffoldMessenger.of(context);
                     try {
@@ -251,7 +251,7 @@ class _SessioScreenState extends State<SessioScreen> {
                       setState(() {
                         _localRepetitions = 0;
                         _haPassatObjectiu = false;
-                        _isExerciseFinished = false; 
+                        _isExerciseFinished = false;
                         _currentPhase = SessioPhase.exercici;
                       });
                     } catch (e) {
@@ -260,7 +260,7 @@ class _SessioScreenState extends State<SessioScreen> {
                       );
                     }
                   }
-                : null, 
+                : null,
               child: const Text("Calibrar i Començar", style: TextStyle(color: Colors.white)),
             ),
           ],
@@ -268,7 +268,7 @@ class _SessioScreenState extends State<SessioScreen> {
 
       case SessioPhase.exercici:
         double alpha = bleService.currentAngle;
-        if (alpha > 140.0) alpha = 0.0; 
+        if (alpha > 140.0) alpha = 0.0;
 
         Color angleColor = AppTheme.errorRed;
         if (alpha >= 5.0 && alpha < _angleObjectiuDinamic) angleColor = Colors.orange;
@@ -299,12 +299,12 @@ class _SessioScreenState extends State<SessioScreen> {
             Text("Angle objectiu d'aquest exercici: ${_angleObjectiuDinamic.toStringAsFixed(0)}°", style: const TextStyle(color: AppTheme.textGrey, fontSize: 16)),
             const SizedBox(height: 30),
             Text(
-              "Repeticions: $_localRepetitions / $_totalRepsExigides", 
+              "Repeticions: $_localRepetitions / $_totalRepsExigides",
               style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: AppTheme.textDark)
             ),
             const Spacer(),
             const Text(
-              "Recepció de dades IMU activa. Flexiona el genoll per moure l'angle.", 
+              "Recepció de dades IMU activa. Flexiona el genoll per moure l'angle.",
               style: TextStyle(color: Colors.grey, fontSize: 13, fontStyle: FontStyle.italic),
               textAlign: TextAlign.center,
             ),
@@ -328,14 +328,14 @@ class _SessioScreenState extends State<SessioScreen> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 40),
-            
+           
             Center(
               child: Text(
                 "$_selectedPainLevel",
                 style: TextStyle(fontSize: 64, fontWeight: FontWeight.bold, color: Color.lerp(Colors.green, Colors.red, _selectedPainLevel / 10)),
               ),
             ),
-            
+           
             Slider(
               value: _selectedPainLevel.toDouble(),
               min: 1,
@@ -355,10 +355,10 @@ class _SessioScreenState extends State<SessioScreen> {
               ],
             ),
             const SizedBox(height: 50),
-            
+           
             ElevatedButton(
               onPressed: _isSavingFirebase ? null : _enviarDadesADataubase,
-              child: _isSavingFirebase 
+              child: _isSavingFirebase
                   ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                   : const Text("Desar dades i Finalitzar"),
             )
