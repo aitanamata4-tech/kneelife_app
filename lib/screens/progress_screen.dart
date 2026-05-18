@@ -13,7 +13,7 @@ class ProgressScreen extends StatefulWidget {
 }
 
 class _ProgressScreenState extends State<ProgressScreen> {
-  String _selectedExerciseKey = "ex1"; // Exercici seleccionat per defecte
+  String _selectedExerciseKey = "ex1"; // Ejercicio seleccionado por defecto
   bool _isLoading = true;
   Map<String, dynamic> _sessionHistory = {};
   String _errorMessage = "";
@@ -58,7 +58,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
       );
     }
 
-    // Ordenem les sessions cronològicament (sessio1, sessio2...)
+    // Ordenamos las sesiones cronológicamente (sessio1, sessio2...)
     final sortedSessionKeys = _sessionHistory.keys.toList()
       ..sort((a, b) => a.compareTo(b));
 
@@ -79,7 +79,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
             const SizedBox(height: 8),
             
             DropdownButtonFormField<String>(
-              initialValue: _selectedExerciseKey,
+              initialValue: _selectedExerciseKey, // CORREGIDO: Usamos initialValue para evitar la advertencia de obsolescencia
               decoration: InputDecoration(
                 filled: true,
                 fillColor: Colors.white,
@@ -100,7 +100,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
             ),
             const SizedBox(height: 24),
 
-            // GRÀFIC 1: EVOLUCIÓ PER EXERCICI (LINE CHART CORREGIT)
+            // GRÁFICO 1: EVOLUCIÓN POR EJERCICIO (LINE CHART DINÁMICO CORREGIDO)
             Card(
               color: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -121,7 +121,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
             ),
             const SizedBox(height: 16),
 
-            // GRÀFIC 2: MILLOR RÈCORD HISTÒRIC (BAR CHART)
+            // GRÁFICO 2: MEJOR RÉCORD HISTÓRICO (BAR CHART)
             Card(
               color: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -136,7 +136,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
             ),
             const SizedBox(height: 32),
 
-            // ESTADÍSTIQUES RESUM
+            // ESTADÍSTICAS DE RESUMEN
             _buildSummaryStats(sortedSessionKeys.length, sortedSessionKeys.isEmpty ? "Cap" : sortedSessionKeys.last),
           ],
         ),
@@ -162,10 +162,16 @@ class _ProgressScreenState extends State<ProgressScreen> {
       return const Center(child: Text("Encara no hi ha dades per a aquest exercici.", style: TextStyle(color: Colors.grey)));
     }
 
+    // Calculamos dinámicamente el límite del eje X según tus datos reales del Firebase
+    double xMaxim = sortedKeys.length.toDouble();
+    if (xMaxim < 1) xMaxim = 1;
+
     return LineChart(
       LineChartData(
         minY: 0,
-        maxY: 120, // Límit adaptat a la flexió clínica de genoll
+        maxY: 120, // Límite adaptado al rango clínico de flexión de rodilla
+        minX: 1,   // Fuerza el inicio visual en la Sesión 1
+        maxX: xMaxim, // CORRECCIÓN CRÍTICA: Bloquea el gráfico para que no invente espacio fantasma
         gridData: FlGridData(
           show: true, 
           drawVerticalLine: false,
@@ -183,6 +189,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
               showTitles: true,
               interval: 1,
               getTitlesWidget: (val, meta) {
+                // Filtro para evitar renderizar números decimales o fuera de rango
+                if (val < 1 || val > xMaxim) return const SizedBox.shrink();
                 return SideTitleWidget(
                   axisSide: meta.axisSide,
                   space: 4,
@@ -196,7 +204,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
             sideTitles: SideTitles(
               showTitles: true, 
               reservedSize: 35,
-              interval: 30, // FIXA L'INTERVAL NET DE 30 EN 30 PER EVITAR AMUNTEGAMENTS
+              interval: 30, // Intervalo fijo y limpio de 30° en 30° sin solapamientos
               getTitlesWidget: (value, meta) {
                 return SideTitleWidget(
                   axisSide: meta.axisSide,
@@ -213,7 +221,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
         lineBarsData: [
           LineChartBarData(
             spots: spots,
-            isCurved: true,
+            isCurved: false, // Líneas rectas profesionales: evita curvaturas extrañas que alteran los picos reales
             color: AppTheme.primaryBlue,
             barWidth: 4,
             isStrokeCapRound: true,
