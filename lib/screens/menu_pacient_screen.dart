@@ -69,7 +69,7 @@ class MenuPacientScreen extends StatelessWidget {
             _buildMenuCard(
               context, 
               "Manual d'Exercicis", 
-              "Consulta com faire cada exercici", 
+              "Consulta com fer cada exercici", 
               Icons.menu_book,
               () {
                 Navigator.push(
